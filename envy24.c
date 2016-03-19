@@ -1512,8 +1512,8 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
 	 return;
      else if(dir == PCMDIR_PLAY)
        {
-         envy24_wri2c(sc, AK4358, a, l | 0x81);
-	 envy24_wri2c(sc, AK4358, a + 1, r | 0x81);
+         envy24_wri2c(sc, AK4358, a, l ?  (l | 0x81) : 0x00);
+	 envy24_wri2c(sc, AK4358, a + 1, r ? (r | 0x81) : 0x00);
 	 return;
        }
 }
@@ -1956,7 +1956,7 @@ envy24chan_trigger(kobj_t obj, void *data, int go)
 		ch->emldma(ch);
 		break;
 	case PCMTRIG_EMLDMARD:
-#if(1)
+#if(0)
 		device_printf(sc->dev, "envy24chan_trigger(): emldmard\n");
 #endif
 		if (ch->run != 1) {
@@ -2181,6 +2181,55 @@ static kobj_method_t envy24mixer_methods[] = {
 	KOBJMETHOD_END
 };
 MIXER_DECLARE(envy24mixer);
+
+/* -------------------------------------------------------------------- */
+
+/* declarations of sysctl functions */
+
+static int
+sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
+{
+  int en;
+  int error;
+  struct sc_info *sc;
+  sc = oidp->oid_arg1;
+  error = sysctl_handle_int(oidp, &en, 0, req);
+  if(error || req->newptr == NULL)
+    return error;
+  if( en < 0 || en > 1)
+    return EINVAL;
+  if(en)
+    {
+      envy24_route(sc, ENVY24_ROUTE_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+      envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
+    }
+  else
+    envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+  return 0;
+}
+
+static int
+sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
+{
+  int en;
+  int error;
+  struct sc_info *sc;
+  sc = oidp->oid_arg1;
+  error = sysctl_handle_int(oidp, &en, 0, req);
+  if(error || req->newptr == NULL)
+    return error;
+  if( en < 0 || en > 1)
+    return EINVAL;
+  if(en)
+    {
+      envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+      envy24_route(sc, ENVY24_ROUTE_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0);
+    }
+  else
+    envy24_route(sc, ENVY24_ROUTE_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+  return 0;
+}
+
 
 /* -------------------------------------------------------------------- */
 
@@ -2591,6 +2640,17 @@ envy24_init(struct sc_info *sc)
 	envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
 	envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
 	/* envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0); */
+	d = device_get_softc(sc->dev);
+	SYSCTL_ADD_PROC(&d->play_sysctl_ctx,
+	  SYSCTL_CHILDREN(d->play_sysctl_tree),
+	  OID_AUTO, "mix_to_ch1", CTLTYPE_INT | CTLFLAG_RW,
+	  &sc, sizeof(void *),
+	  sysctl_dev_pcm_mix_to_ch1, "I", "Set mix out to CH1");
+	SYSCTL_ADD_PROC(&d->play_sysctl_ctx,
+	  SYSCTL_CHILDREN(d->play_sysctl_tree),
+	  OID_AUTO, "mix_to_spdif", CTLTYPE_INT | CTLFLAG_RW,
+	  &sc, sizeof(void *),
+	  sysctl_dev_pcm_mix_to_spdif, "I", "Set mix out to SPDIF");
 
 	/* set macro interrupt mask */
 	data = envy24_rdcs(sc, ENVY24_CCS_IMASK, 1);
