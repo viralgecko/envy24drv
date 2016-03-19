@@ -1,0 +1,35 @@
+data of device i2c 0x20
+
+pcm1: envy24_init(): probe data = 0x43, reg = 0x00
+pcm1: envy24_init(): probe data = 0x6a, reg = 0x01
+pcm1: envy24_init(): probe data = 0x88, reg = 0x02
+pcm1: envy24_init(): probe data = 0x48, reg = 0x03
+pcm1: envy24_init(): probe data = 0xee, reg = 0x04
+pcm1: envy24_init(): probe data = 0xb5, reg = 0x05
+pcm1: envy24_init(): probe data = 0x10, reg = 0x06
+pcm1: envy24_init(): probe data = 0x10, reg = 0x07
+pcm1: envy24_init(): probe data = 0x00, reg = 0x08
+pcm1: envy24_init(): probe data = 0x00, reg = 0x09
+pcm1: envy24_init(): probe data = 0x00, reg = 0x0a
+pcm1: envy24_init(): probe data = 0x00, reg = 0x0b
+pcm1: envy24_init(): probe data = 0x00, reg = 0x0c
+pcm1: envy24_init(): probe data = 0x00, reg = 0x0d
+pcm1: envy24_init(): probe data = 0x00, reg = 0x0e
+pcm1: envy24_init(): probe data = 0x00, reg = 0x0f
+pcm1: envy24_init(): probe data = 0x00, reg = 0x10
+pcm1: envy24_init(): probe data = 0x00, reg = 0x11
+pcm1: envy24_init(): probe data = 0x00, reg = 0x12
+pcm1: envy24_init(): probe data = 0x00, reg = 0x13
+pcm1: envy24_init(): probe data = 0x00, reg = 0x14
+pcm1: envy24_init(): probe data = 0x00, reg = 0x15
+pcm1: envy24_init(): probe data = 0x00, reg = 0x16
+pcm1: envy24_init(): probe data = 0x00, reg = 0x17
+pcm1: envy24_init(): probe data = 0x00, reg = 0x18
+pcm1: envy24_init(): probe data = 0x00, reg = 0x19
+pcm1: envy24_init(): probe data = 0x00, reg = 0x1a
+pcm1: envy24_init(): probe data = 0x00, reg = 0x1b
+pcm1: envy24_init(): probe data = 0x00, reg = 0x1c
+pcm1: envy24_init(): probe data = 0x00, reg = 0x1d
+pcm1: envy24_init(): probe data = 0x00, reg = 0x1e
+pcm1: envy24_init(): probe data = 0x00, reg = 0x1f
+
