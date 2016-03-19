@@ -1,0 +1,12 @@
+http://code.metager.de/source/xref/freebsd/sys/dev/sound/pcm/mixer.c#455
+http://code.metager.de/source/xref/freebsd/sys/sys/soundcard.h#1851
+http://code.metager.de/source/xref/freebsd/sys/sys/soundcard.h#1067
+http://code.metager.de/source/xref/freebsd/sys/sys/soundcard.h#SOUND_MIXER_VOLUME
+
+
+write
+m->enuminfo->stringindex[]
+m->enuminfo->strings[]
+
+dev devicenumber of mixer
+lookuptable mixmap with dev
