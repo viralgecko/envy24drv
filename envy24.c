@@ -1487,10 +1487,37 @@ envy24_esp_ak4358_init(void *codec)
       if(ptr == NULL)
 	return;
       struct sc_info *sc = ptr->parent;
+      envy24_wri2c(sc, AK4358, 0x00, 0xC7);
+      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x01, 0x01);
       DELAY(32);
-      envy24_wri2c(sc, AK4358, 0x01, 0x00);
-      envy24_wri2c(sc, AK4358, 0x0A, 0x02);
+      envy24_wri2c(sc, AK4358, 0x02, 0x4F);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x03, 0x01);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x04, 0xCB);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x05, 0xCB);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x06, 0xCB);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x07, 0xCB);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x08, 0xCB);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x09, 0xCB);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x0A, 0x03);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x0B, 0xCB);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x0C, 0xCB);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x0D, 0x00);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x0E, 0x00);
+      DELAY(32);
+      envy24_wri2c(sc, AK4358, 0x0F, 0x00);
 }
 
 static void
@@ -1512,8 +1539,8 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
 	 return;
      else if(dir == PCMDIR_PLAY)
        {
-         envy24_wri2c(sc, AK4358, a, l | 0x83);
-	 envy24_wri2c(sc, AK4358, a + 1, r | 0x83);
+         envy24_wri2c(sc, AK4358, a, l | 0x80);
+	 envy24_wri2c(sc, AK4358, a + 1, r | 0x80);
 	 return;
        }
 }
