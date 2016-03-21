@@ -29,6 +29,8 @@
 #include "opt_snd.h"
 #endif
 
+#include <sys/types.h>
+#include <sys/sysctl.h>
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
 #include <dev/sound/pci/spicds.h>
@@ -422,6 +424,9 @@ static struct envy24_emldma envy24_remltab[] = {
 	{SND_FORMAT(AFMT_S32_LE, 2, 0), envy24_r32sl, 8},
 	{0, NULL, 0}
 };
+
+static unsigned int mix_to_ch1 = 1;
+static unsigned int mix_to_spdif = 0;
 
 /* -------------------------------------------------------------------- */
 
@@ -1527,7 +1532,6 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
        {
          i = envy24_wri2c(sc, AK4358, a, l | 0x80);
 	 envy24_wri2c(sc, AK4358, a + 1, r | 0x80);
-         device_printf(sc->dev,"envy24_esp_ak4358_setvolume(viod *codec, %u, 0x%X, 0x%X)\n",i,l | 0x80, r | 0x80);
 	 return;
        }
 }
@@ -2152,9 +2156,11 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 
 	snd_mtxlock(sc->lock);
 	if (dev == 0) {
-		for (i = 0; i < sc->dacn; i++) {
+	  envy24_wrci(sc, ENVY24_CCI_PLVOL, ~(left & ENVY24_CCI_VOL_MASK));
+	  envy24_wrci(sc, ENVY24_CCI_PRVOL, ~(right & ENVY24_CCI_VOL_MASK));
+	  /*	for (i = 0; i < sc->dacn; i++) {
 			sc->cfg->codec->setvolume(sc->dac[i], PCMDIR_PLAY, left, right);
-		}
+			}*/
 	}
 	else {
 		/* set volume value for hardware */
@@ -2216,9 +2222,11 @@ sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
     {
       envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
       envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
+      mix_to_spdif = 0;
     }
   else
     envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+  mix_to_ch1 = en;
   return 0;
 }
 
@@ -2238,9 +2246,11 @@ sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
     {
       envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
       envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0);
+      mix_to_ch1 = 0;
     }
   else
     envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+  mix_to_spdif = en;
   return 0;
 }
 
@@ -2577,7 +2587,7 @@ envy24_init(struct sc_info *sc)
 #endif
 	int i;
 	u_int32_t sv, sd;
-	struct snddev_info      *d;
+	struct snddev_info *d;
 
 
 #if(0)
@@ -2656,16 +2666,30 @@ envy24_init(struct sc_info *sc)
 	envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
 	/* envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0); */
        	d = device_get_softc(sc->dev);
-        SYSCTL_ADD_PROC(&d->play_sysctl_ctx,
+	struct sysctl_ctx_list *clist = &d->play_sysctl_ctx;
+	sysctl_ctx_init(clist);  //mix_to_ch1
+	//d->play_sysctl_tree = SYSCTL_ADD_ROOT_NODE(clist, OID_AUTO, "envy24", CTLFLAG_RW, 0, "controls for all envy24 sondcards");
+	d->play_sysctl_tree = SYSCTL_ADD_NODE(clist, OID_AUTO,
+	  SYSCTL_NODE_CHILDREN(SYSCTL_CHILDREN(_hw), "snd"),
+	  "envy24", CTLFLAG_RW, 0,
+	  "controls for all envy24 sondcards");
+	device_printf(sc->dev,"the pointers for ctx struct: clist 0x%X, olist 0x%X\n", (int)(clist), (int)(d->play_sysctl_tree));
+	SYSCTL_ADD_UINT(clist,
 	  SYSCTL_CHILDREN(d->play_sysctl_tree),
-	  OID_AUTO, "mix_to_ch1", CTLTYPE_INT | CTLFLAG_RW,
+          OID_AUTO, "mix_to_ch1", CTLTYPE_INT | CTLFLAG_RD, SYSCTL_NULL_UINT_PTR, &mix_to_ch1, "indicates mixer out is ch1");
+        SYSCTL_ADD_UINT(clist,
+	  SYSCTL_CHILDREN(d->play_sysctl_tree),
+          OID_AUTO, "mix_to_spdif", CTLTYPE_INT | CTLFLAG_RD, SYSCTL_NULL_UINT_PTR, &mix_to_spdif, "indicates mixer out is spdif");
+        SYSCTL_ADD_PROC(clist,
+	  SYSCTL_CHILDREN(d->play_sysctl_tree),
+	  OID_AUTO, "set_mix_to_ch1", CTLTYPE_INT | CTLFLAG_RW,
 	  &sc, sizeof(void *),
-	  &sysctl_dev_pcm_mix_to_ch1, "I", "Set mix out to CH1");
-	SYSCTL_ADD_PROC(&d->play_sysctl_ctx,
+	  sysctl_dev_pcm_mix_to_ch1, "I", "Set mix out to CH1");
+	SYSCTL_ADD_PROC(clist,
 	  SYSCTL_CHILDREN(d->play_sysctl_tree),
 	  OID_AUTO, "mix_to_spdif", CTLTYPE_INT | CTLFLAG_RW,
 	  &sc, sizeof(void *),
-	  &sysctl_dev_pcm_mix_to_spdif, "I", "Set mix out to SPDIF");
+	  sysctl_dev_pcm_mix_to_spdif, "I", "Set mix out to SPDIF");
 	/* set macro interrupt mask */
 	data = envy24_rdcs(sc, ENVY24_CCS_IMASK, 1);
 	envy24_wrcs(sc, ENVY24_CCS_IMASK, data & ~ENVY24_CCS_IMASK_PMT, 1);
@@ -2848,11 +2872,14 @@ envy24_pci_detach(device_t dev)
 	struct sc_info *sc;
 	int r;
 	int i;
+	struct snddev_info *d;
 
 #if(0)
 	device_printf(dev, "envy24_pci_detach()\n");
 #endif
 	sc = pcm_getdevinfo(dev);
+	d = device_get_softc(sc->dev);
+	sysctl_ctx_free(&d->play_sysctl_ctx);
 	if (sc == NULL)
 		return 0;
 	r = pcm_unregister(dev);
