@@ -1451,16 +1451,16 @@ envy24_esp_ak4358_create(device_t dev, void *info, int dir, int num)
 	  {
 	    switch(num)
 	      {
-	        case 1:
+	        case 0:
 		  buff->addr = AK4358_ATTL1;
 		  break;
-		case 2:
+		case 1:
 		  buff->addr = AK4358_ATTL2;
 		  break;
-		case 3:
+		case 2:
 		  buff->addr = AK4358_ATTL3;
 		  break;
-		case 4:
+		case 3:
 		  buff->addr = AK4358_ATTL4;
 		  break;
 	      }
@@ -1488,35 +1488,20 @@ envy24_esp_ak4358_init(void *codec)
 	return;
       struct sc_info *sc = ptr->parent;
       envy24_wri2c(sc, AK4358, 0x00, 0xC7);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x01, 0x01);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x02, 0x4F);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x03, 0x01);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x04, 0xCB);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x05, 0xCB);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x06, 0xCB);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x07, 0xCB);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x08, 0xCB);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x09, 0xCB);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x0A, 0x03);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x0B, 0xCB);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x0C, 0xCB);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x0D, 0x00);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x0E, 0x00);
-      DELAY(32);
       envy24_wri2c(sc, AK4358, 0x0F, 0x00);
 }
 
@@ -1530,6 +1515,7 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
      char a = (char)(ptr->addr);
      char l = (char)(left);
      char r = (char)(right);
+     int i = 0;
 #if(0)
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume(viod *codec, %i, %u, %u)\n",dir,left,right);
 #endif
@@ -1539,8 +1525,9 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
 	 return;
      else if(dir == PCMDIR_PLAY)
        {
-         envy24_wri2c(sc, AK4358, a, l | 0x80);
+         i = envy24_wri2c(sc, AK4358, a, l | 0x80);
 	 envy24_wri2c(sc, AK4358, a + 1, r | 0x80);
+         device_printf(sc->dev,"envy24_esp_ak4358_setvolume(viod *codec, %u, 0x%X, 0x%X)\n",i,l | 0x80, r | 0x80);
 	 return;
        }
 }
@@ -2590,7 +2577,7 @@ envy24_init(struct sc_info *sc)
 #endif
 	int i;
 	u_int32_t sv, sd;
-	//struct snddev_info      *d;
+	struct snddev_info      *d;
 
 
 #if(0)
@@ -2668,18 +2655,17 @@ envy24_init(struct sc_info *sc)
 	envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
 	envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
 	/* envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0); */
-	/*	d = device_get_softc(sc->dev);
-		SYSCTL_ADD_PROC(&d->play_sysctl_ctx,
+       	d = device_get_softc(sc->dev);
+        SYSCTL_ADD_PROC(&d->play_sysctl_ctx,
 	  SYSCTL_CHILDREN(d->play_sysctl_tree),
 	  OID_AUTO, "mix_to_ch1", CTLTYPE_INT | CTLFLAG_RW,
 	  &sc, sizeof(void *),
-	  sysctl_dev_pcm_mix_to_ch1, "I", "Set mix out to CH1");
+	  &sysctl_dev_pcm_mix_to_ch1, "I", "Set mix out to CH1");
 	SYSCTL_ADD_PROC(&d->play_sysctl_ctx,
 	  SYSCTL_CHILDREN(d->play_sysctl_tree),
 	  OID_AUTO, "mix_to_spdif", CTLTYPE_INT | CTLFLAG_RW,
 	  &sc, sizeof(void *),
-	  sysctl_dev_pcm_mix_to_spdif, "I", "Set mix out to SPDIF");
-	*/
+	  &sysctl_dev_pcm_mix_to_spdif, "I", "Set mix out to SPDIF");
 	/* set macro interrupt mask */
 	data = envy24_rdcs(sc, ENVY24_CCS_IMASK, 1);
 	envy24_wrcs(sc, ENVY24_CCS_IMASK, data & ~ENVY24_CCS_IMASK_PMT, 1);
