@@ -34,10 +34,8 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
 #include <dev/sound/pci/spicds.h>
-#include <dev/sound/pci/envy24.h>
-#ifndef ENVY24H
+//#include <dev/sound/pci/envy24.h>
 #include "envy24.h"
-#endif
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -2088,6 +2086,7 @@ static int
 envy24mixer_init(struct snd_mixer *m)
 {
 	struct sc_info *sc = mix_getdevinfo(m);
+	int i;
 
 #if(0)
 	device_printf(sc->dev, "envy24mixer_init()\n");
@@ -2101,8 +2100,10 @@ envy24mixer_init(struct snd_mixer *m)
 
 	mix_setdevs(m, ENVY24_MIX_MASK);
 	mix_setrecdevs(m, ENVY24_MIX_REC_MASK);
+	for(i = 0; i < ENVY24_MIX_MASK; i++)
+	  mix_setrealdev(m, i, i);
 	snd_mtxunlock(sc->lock);
-
+	
 	return 0;
 }
 
@@ -2146,13 +2147,14 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 		return -1;
 	if (dev == 0 && sc->cfg->codec->setvolume == NULL)
 		return -1;
-	if (dev != 0 && ch == -1)
-		return -1;
-	hwch = envy24_chanmap[ch];
 #if(0)
 	device_printf(sc->dev, "envy24mixer_set(m, %d, %d, %d)\n",
 	    dev, left, right);
 #endif
+	if (dev != 0 && ch == -1)
+		return -1;
+	hwch = envy24_chanmap[ch];
+
 
 	snd_mtxlock(sc->lock);
 	if (dev == 0) {
