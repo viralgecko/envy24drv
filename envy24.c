@@ -244,23 +244,23 @@ static unsigned envy24_chanmap[ENVY24_CHAN_NUM] = {
 /* mixer -> API channel map. see above */
 static int envy24_mixmap[] = {
 	-1, /* Master output level. It is depend on codec support */
-	-1, /* Treble level of all output channels */
-	-1, /* Bass level of all output channels */
-	-1, /* Volume of synthesier input */
-	0,  /* Output level for the audio device */
-	-1, /* Output level for the PC speaker */
+	1, /* Treble level of all output channels */
+	2, /* Bass level of all output channels */
+	3, /* Volume of synthesier input */
+	4,  /* Output level for the audio device */
+	0, /* Output level for the PC speaker */
 	7,  /* line in jack */
-	-1, /* microphone jack */
-	-1, /* CD audio input */
-	-1, /* Recording monitor */
-	1,  /* alternative codec */
-	-1, /* global recording level */
+	8, /* microphone jack */
+	9, /* CD audio input */
+	10, /* Recording monitor */
+	6,  /* alternative codec */
+	5, /* global recording level */
 	-1, /* Input gain */
 	-1, /* Output gain */
-	8,  /* Input source 1 */
-	9,  /* Input source 2 */
-	10, /* Input source 3 */
-	6,  /* Digital (input) 1 */
+	-1,  /* Input source 1 */
+	-1,  /* Input source 2 */
+	-1, /* Input source 3 */
+	-1,  /* Digital (input) 1 */
 	-1, /* Digital (input) 2 */
 	-1, /* Digital (input) 3 */
 	-1, /* Phone input */
@@ -2086,7 +2086,7 @@ static int
 envy24mixer_init(struct snd_mixer *m)
 {
 	struct sc_info *sc = mix_getdevinfo(m);
-	int i;
+	//int i;
 
 #if(0)
 	device_printf(sc->dev, "envy24mixer_init()\n");
@@ -2100,8 +2100,8 @@ envy24mixer_init(struct snd_mixer *m)
 
 	mix_setdevs(m, ENVY24_MIX_MASK);
 	mix_setrecdevs(m, ENVY24_MIX_REC_MASK);
-	for(i = 0; i < ENVY24_MIX_MASK; i++)
-	  mix_setrealdev(m, i, i);
+	/*for(i = 0; i < ENVY24_MIX_MASK; i++)
+	  mix_setrealdev(m, i, i);*/
 	snd_mtxunlock(sc->lock);
 	
 	return 0;
@@ -2165,6 +2165,8 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 			}*/
 	}
 	else {
+	  if(mix_to_spdif || mix_to_ch1)
+	    {
 		/* set volume value for hardware */
 		if ((sc->left[hwch] = 100 - left) > ENVY24_VOL_MIN)
 			sc->left[hwch] = ENVY24_VOL_MUTE;
@@ -2174,6 +2176,14 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 		/* set volume for record channel and running play channel */
 		if (hwch > ENVY24_CHAN_PLAY_SPDIF || sc->chan[ch].run)
 			envy24_setvolume(sc, hwch);
+	    }
+	  else
+	    {
+	      if(hwch > 0 && hwch < 5)
+		sc->cfg->codec->setvolume(sc->dac[hwch - 1], PCMDIR_PLAY, left, right);
+	      else if( hwch > 6 && hwch < 10)
+		sc->cfg->codec->setvolume(sc->dac[hwch - 6], PCMDIR_REC, left, right);
+	    }
 	}
 	snd_mtxunlock(sc->lock);
 
@@ -2225,9 +2235,11 @@ sysctl_hw_snd_mix_to_ch1(SYSCTL_HANDLER_ARGS)
     {
       envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
       envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
+      mix_to_spdif = 0;
     }
   else
     envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+  mix_to_ch1 = en;
   return 0;
 }
 
@@ -2248,10 +2260,12 @@ sysctl_hw_snd_mix_to_spdif(SYSCTL_HANDLER_ARGS)
     {
       envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
       envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0);
+      mix_to_ch1 = 0;
     }
   else
     envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
-  return 0;
+  mix_to_spdif = en;
+  return en;
 }
 
 
@@ -2673,10 +2687,10 @@ envy24_init(struct sc_info *sc)
 	device_printf(sc->dev,"the pointers for ctx struct: clist 0x%X, olist 0x%X\n", (int)(clist), (int)(d->play_sysctl_tree));
 	SYSCTL_ADD_UINT(clist,
 	  SYSCTL_CHILDREN(d->play_sysctl_tree),
-	  OID_AUTO, "mix_to_ch1", CTLTYPE_UINT | CTLFLAG_RD, SYSCTL_NULL_UINT_PTR, (intptr_t)(mix_to_ch1), "indicates mixer out is ch1");
+	  OID_AUTO, "mix_to_ch1", CTLTYPE_UINT | CTLFLAG_RD, SYSCTL_NULL_UINT_PTR, (intptr_t)(&mix_to_ch1), "indicates mixer out is ch1");
         SYSCTL_ADD_UINT(clist,
 	  SYSCTL_CHILDREN(d->play_sysctl_tree),
-  	  OID_AUTO, "mix_to_spdif", CTLTYPE_UINT | CTLFLAG_RD, SYSCTL_NULL_UINT_PTR, (intptr_t)(mix_to_spdif), "indicates mixer out is spdif");
+  	  OID_AUTO, "mix_to_spdif", CTLTYPE_UINT | CTLFLAG_RD, SYSCTL_NULL_UINT_PTR, (intptr_t)(&mix_to_spdif), "indicates mixer out is spdif");
         SYSCTL_ADD_PROC(clist,
 	  SYSCTL_CHILDREN(d->play_sysctl_tree),
 	  OID_AUTO, "set_mix_to_ch1", CTLTYPE_INT | CTLFLAG_WR,

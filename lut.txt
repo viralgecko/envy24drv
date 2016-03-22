@@ -1,0 +1,43 @@
+/* API -> hardware channel map */
+static unsigned envy24_chanmap[ENVY24_CHAN_NUM] = {
+	ENVY24_CHAN_PLAY_SPDIF, /* 0 */
+	ENVY24_CHAN_PLAY_DAC1,  /* 1 */
+	ENVY24_CHAN_PLAY_DAC2,  /* 2 */
+	ENVY24_CHAN_PLAY_DAC3,  /* 3 */
+	ENVY24_CHAN_PLAY_DAC4,  /* 4 */
+	ENVY24_CHAN_REC_MIX,    /* 5 */
+	ENVY24_CHAN_REC_SPDIF,  /* 6 */
+	ENVY24_CHAN_REC_ADC1,   /* 7 */
+	ENVY24_CHAN_REC_ADC2,   /* 8 */
+	ENVY24_CHAN_REC_ADC3,   /* 9 */
+	ENVY24_CHAN_REC_ADC4,   /* 10 */
+};
+
+/* mixer -> API channel map. see above */
+static int envy24_mixmap[] = {
+	-1, /* Master output level. It is depend on codec support */
+	1, /* Treble level of all output channels */
+	2, /* Bass level of all output channels */
+	3, /* Volume of synthesier input */
+	4,  /* Output level for the audio device */
+	0, /* Output level for the PC speaker */
+	7,  /* line in jack */
+	8, /* microphone jack */
+	9, /* CD audio input */
+	10, /* Recording monitor */
+	6,  /* alternative codec */
+	5, /* global recording level */
+	-1, /* Input gain */
+	-1, /* Output gain */
+	-1,  /* Input source 1 */
+	-1,  /* Input source 2 */
+	-1, /* Input source 3 */
+	-1,  /* Digital (input) 1 */
+	-1, /* Digital (input) 2 */
+	-1, /* Digital (input) 3 */
+	-1, /* Phone input */
+	-1, /* Phone output */
+	-1, /* Video/TV (audio) in */
+	-1, /* Radio in */
+	-1, /* Monitor volume */
+};
