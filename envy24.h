@@ -384,8 +384,8 @@
 #define ENVY24_CHAN_REC_SPDIF  9
 #define ENVY24_CHAN_REC_MIX   10
 
-#define ENVY24_MIX_MASK     0x3ff
-#define ENVY24_MIX_REC_MASK 0x3e0
+#define ENVY24_MIX_MASK     0xfff
+#define ENVY24_MIX_REC_MASK 0xfc0
 
 /* volume value constants */
 #define ENVY24_VOL_MAX    0 /* 0db(negate) */

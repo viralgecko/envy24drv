@@ -2085,7 +2085,6 @@ static int
 envy24mixer_init(struct snd_mixer *m)
 {
 	struct sc_info *sc = mix_getdevinfo(m);
-	//int i;
 
 #if(0)
 	device_printf(sc->dev, "envy24mixer_init()\n");
@@ -2099,8 +2098,7 @@ envy24mixer_init(struct snd_mixer *m)
 
 	mix_setdevs(m, ENVY24_MIX_MASK);
 	mix_setrecdevs(m, ENVY24_MIX_REC_MASK);
-	/*for(i = 0; i < ENVY24_MIX_MASK; i++)
-	  mix_setrealdev(m, i, i);*/
+	mix_setparentchild(m, 0, 0x3F);
 	snd_mtxunlock(sc->lock);
 	
 	return 0;
@@ -2178,10 +2176,10 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 	    }
 	  else
 	    {
-	      if(hwch > 0 && hwch < 5)
-		sc->cfg->codec->setvolume(sc->dac[hwch - 1], PCMDIR_PLAY, left, right);
-	      else if( hwch > 6 && hwch < 10)
-		sc->cfg->codec->setvolume(sc->dac[hwch - 6], PCMDIR_REC, left, right);
+	      if(hwch >= 0 && hwch < 4)
+		sc->cfg->codec->setvolume(sc->dac[hwch], PCMDIR_PLAY, left, right);
+	      else if( hwch > 4 && hwch < 9)
+		sc->cfg->codec->setvolume(sc->dac[hwch - 5], PCMDIR_REC, left, right);
 	    }
 	}
 	snd_mtxunlock(sc->lock);
