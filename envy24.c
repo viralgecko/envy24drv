@@ -1522,7 +1522,7 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume(viod *codec, %i, %u, %u)\n",dir,left,right);
 #endif
      if( dir == PCMDIR_REC && ptr->num == 1)
-	 device_printf(sc->dev,"Preamp control not implemented yet");
+	 device_printf(sc->dev,"Preamp control not implemented yet\n");
      else if( dir == PCMDIR_REC)
 	 return;
      else if(dir == PCMDIR_PLAY)
@@ -1661,8 +1661,8 @@ envy24_r32sl(struct sc_chinfo *ch)
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 
 	for (i = 0; i < length; i++) {
-		data[dst] = dmabuf[src * ENVY24_REC_CHNUM + slot].buffer;
-		data[dst + 1] = dmabuf[src * ENVY24_REC_CHNUM + slot + 1].buffer;
+	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer;
+	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer;
 		dst += 2;
 		dst %= dsize;
 		src++;
@@ -1691,8 +1691,8 @@ envy24_r16sl(struct sc_chinfo *ch)
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 
 	for (i = 0; i < length; i++) {
-		data[dst] = dmabuf[src * ENVY24_REC_CHNUM + slot].buffer;
-		data[dst + 1] = dmabuf[src * ENVY24_REC_CHNUM + slot + 1].buffer;
+	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer;
+	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer;
 		dst += 2;
 		dst %= dsize;
 		src++;
@@ -2085,6 +2085,7 @@ static int
 envy24mixer_init(struct snd_mixer *m)
 {
 	struct sc_info *sc = mix_getdevinfo(m);
+	int devs;
 
 #if(0)
 	device_printf(sc->dev, "envy24mixer_init()\n");
@@ -2099,8 +2100,8 @@ envy24mixer_init(struct snd_mixer *m)
 	mix_setdevs(m, ENVY24_MIX_MASK);
 	mix_setrecdevs(m, ENVY24_MIX_REC_MASK);
 	mix_setparentchild(m, 0, 0x3F);
+	devs = mix_getdevs(m);
 	snd_mtxunlock(sc->lock);
-	
 	return 0;
 }
 
@@ -2191,7 +2192,11 @@ static u_int32_t
 envy24mixer_setrecsrc(struct snd_mixer *m, u_int32_t src)
 {
 	struct sc_info *sc = mix_getdevinfo(m);
-	int ch = envy24_mixmap[src];
+	u_int32_t work = src;
+	u_int32_t recsrc = 0;
+	while(work>>=1)
+	  recsrc++;
+	int ch = envy24_mixmap[recsrc];
 #if(0)
 	device_printf(sc->dev, "envy24mixer_setrecsrc(m, %d)\n", src);
 #endif
