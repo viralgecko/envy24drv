@@ -67,7 +67,7 @@ struct sc_info;
 
 struct envy24_sample {
         volatile u_int32_t buffer;
-};
+}__attribute__((__packed__));
 
 typedef struct envy24_sample sample32_t;
 
@@ -1661,8 +1661,8 @@ envy24_r32sl(struct sc_chinfo *ch)
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 
 	for (i = 0; i < length; i++) {
-	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer;
-	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer;
+	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 8;
+	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer >> 8;
 		dst += 2;
 		dst %= dsize;
 		src++;
@@ -1691,8 +1691,8 @@ envy24_r16sl(struct sc_chinfo *ch)
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 
 	for (i = 0; i < length; i++) {
-	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer;
-	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer;
+	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 16;
+	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer >> 16;
 		dst += 2;
 		dst %= dsize;
 		src++;
