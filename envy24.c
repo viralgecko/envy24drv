@@ -176,6 +176,9 @@ struct sc_info {
 	/* channel info table */
 	unsigned	chnum;
 	struct sc_chinfo chan[11];
+
+        /* secondary mixer */
+        struct snd_mixer *sm;
 };
 
 /* -------------------------------------------------------------------- */
@@ -2156,16 +2159,15 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 	device_printf(sc->dev, "envy24mixer_set(m, %d, %d, %d)\n",
 	    dev, left, right);
 #endif
-	//return -1;
+
 	if (dev != 0 && ch == -1)
 		return -1;
 	if(ch < 12) {
 	  hwch = envy24_chanmap[ch];
 	}
-	//return -1;
 	if(dev > 11) {
 	  device_printf(sc->dev, "envy24mixer_set(m, %d, %d, %d)\n",dev - 12, left, right);
-	  //envy24hwmixer_set(sc->sm, dev - 12, left, right);
+	  mix_set(sc->sm, dev - 12, left, right);
 	}
 
 	snd_mtxlock(sc->lock);
@@ -2274,7 +2276,8 @@ envy24hwmixer_uninit(struct snd_mixer *m)
 static int
 envy24hwmixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right)
 {
-  return right << 8 | left;
+        device_printf(sc->dev, "envy24hwmixer_set(m, %d, %d, %d)\n",
+	dev, left, right);
 	struct sc_info *sc = mix_getdevinfo(m);
 
 	if (sc == NULL)
@@ -2289,16 +2292,10 @@ envy24hwmixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned rig
 
 
 	snd_mtxlock(sc->lock);
-	/*	if (dev == 0) {
-	  envy24_wrci(sc, ENVY24_CCI_PLVOL, ~(left & ENVY24_CCI_VOL_MASK));
-	  envy24_wrci(sc, ENVY24_CCI_PRVOL, ~(right & ENVY24_CCI_VOL_MASK));
-	  }
-	  else {*/
 	  if(dev < 4)
 	    sc->cfg->codec->setvolume(sc->dac[dev], PCMDIR_PLAY, left, right);
 	  else if( dev > 4 && dev < 9)
 	    sc->cfg->codec->setvolume(sc->dac[dev - 5], PCMDIR_REC, left, right);
-	  //}
 	snd_mtxunlock(sc->lock);
 
 	return right << 8 | left;
@@ -2637,6 +2634,7 @@ envy24_dmainit(struct sc_info *sc)
 
 	return 0;
  bad:
+	device_printf(sc->dev, "envy24_dmainit(): Error during initialize of DMA\n");
 	envy24_dmafree(sc);
 	return ENOSPC;
 }
@@ -2943,15 +2941,14 @@ envy24_pci_attach(device_t dev)
 		device_printf(dev, "unable to initialize the card\n");
 		goto bad;
 	}
-	//goto bad;
 
 	/* set multi track mixer */
 	mixer_init(dev, &envy24mixer_class, sc);
 	mixer_create(dev, &envy24hwmixer_class, sc, "mixer controlling hardware");
-	//if(sc->sm == NULL){
-	//        device_printf(dev,"unable to init secondary mixer\n");
-	//	goto bad;
-	//}
+	if(sc->sm == NULL){
+	        device_printf(dev,"unable to init secondary mixer\n");
+		goto bad;
+	}
 
 	/* set channel information */
 	err = pcm_register(dev, sc, 5, 2 + sc->adcn);
@@ -2984,6 +2981,7 @@ envy24_pci_attach(device_t dev)
 	return 0;
 
 bad:
+	device_printf(sc->dev, "envy24_pci_attach(): Error during attach of pci device\n");
 	if (sc->ih)
 		bus_teardown_intr(dev, sc->irq, sc->ih);
 	if (sc->irq)
@@ -3025,18 +3023,11 @@ envy24_pci_detach(device_t dev)
 	sc = pcm_getdevinfo(dev);
 	if (sc == NULL)
 		return 0;
-	/*r = mixer_delete(sc->sm);
+	r = mixer_delete(sc->sm);
 	if(r)
 	        return r;
-		sc->sm = NULL;*/
-	bus_dmamap_unload(sc->dmat, sc->pmap);
-	bus_dmamap_unload(sc->dmat, sc->rmap);
-	bus_dmamem_free(sc->dmat, sc->rbuf, sc->rmap);
-	bus_dmamem_free(sc->dmat, sc->pbuf, sc->pmap);
-	sc->rmap = NULL;
-	sc->pmap = NULL;
-	sc->pbuf = NULL;
-	sc->rbuf = NULL;
+	sc->sm = NULL;
+	envy24_dmafree(sc);
 	r = pcm_unregister(dev);
 	if (r)
 		return r;
