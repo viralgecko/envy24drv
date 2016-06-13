@@ -67,7 +67,7 @@ struct sc_info;
 
 struct envy24_sample {
         volatile u_int32_t buffer;
-};
+}__attribute__((__packed__));
 
 typedef struct envy24_sample sample32_t;
 
@@ -1698,8 +1698,13 @@ envy24_r16sl(struct sc_chinfo *ch)
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 
 	for (i = 0; i < length; i++) {
+<<<<<<< HEAD
 	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 8;
 	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer >> 8;
+=======
+	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 16;
+	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer >> 16;
+>>>>>>> parent of d251392... corrected off by one error
 		dst += 2;
 		dst %= dsize;
 		src++;
@@ -2353,6 +2358,7 @@ sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
     return EINVAL;
   if(en)
     {
+      envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
       envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
     }
   else
@@ -2376,6 +2382,7 @@ sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
     return EINVAL;
   if(en)
     {
+      envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
       envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0);
     }
   else
@@ -2453,7 +2460,7 @@ envy24_intr(void *p)
 		ptr = dsize - envy24_rdmt(sc, ENVY24_MT_RCNT, 2) - 1;
 		ptr -= ptr % sc->blk[1];
 		feed = (ptr + dsize - sc->intr[1]) % dsize; 
-		for (i = (ENVY24_CHAN_REC_ADC1 + 1); i <= (ENVY24_CHAN_REC_SPDIF + 1); i++) {
+		for (i = ENVY24_CHAN_REC_ADC1; i <= ENVY24_CHAN_REC_SPDIF; i++) {
 			ch = &sc->chan[i];
 			if (ch->run && ch->blk <= feed) {
 				snd_mtxunlock(sc->lock);
