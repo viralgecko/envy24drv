@@ -1563,7 +1563,8 @@ envy24_p32sl(struct sc_chinfo *ch)
 	ssize = ch->size / 4;
 	dsize = ch->size / 8;
 	slot = ch->num * 2;
-
+	
+        bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = data[src];
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = data[src + 1];
@@ -1572,6 +1573,7 @@ envy24_p32sl(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 	
 	return;
 }
@@ -1599,7 +1601,7 @@ envy24_p16sl(struct sc_chinfo *ch)
 #if(0)
 	device_printf(ch->parent->dev, "envy24_p16sl():%lu-->%lu(%lu)\n", src, dst, length);
 #endif
-	
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = (u_int32_t)data[src] << 16;
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = (u_int32_t)data[src + 1] << 16;
@@ -1614,6 +1616,7 @@ envy24_p16sl(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 #if(0)
 	printf("\n");
 #endif
@@ -1638,7 +1641,8 @@ envy24_p8u(struct sc_chinfo *ch)
 	ssize = ch->size;
 	dsize = ch->size / 4;
 	slot = ch->num * 2;
-	
+
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = ((u_int32_t)data[src] ^ 0x80) << 24;
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = ((u_int32_t)data[src + 1] ^ 0x80) << 24;
@@ -1647,6 +1651,7 @@ envy24_p8u(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 	
 	return;
 }
@@ -1669,15 +1674,17 @@ envy24_r32sl(struct sc_chinfo *ch)
 	ssize = ch->size / 8;
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 	src %= ssize;
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_PREREAD);
 
 	for (i = 0; i < length; i++) {
-	        data[dst] = dmabuf[src * ENVY24_REC_CHNUM + slot].buffer & 0xFFFFFF00;
-	        data[dst + 1] = dmabuf[src * ENVY24_REC_CHNUM + slot + 1].buffer & 0xFFFFFF00;
+	        data[dst] = dmabuf[src * ENVY24_REC_CHNUM + slot].buffer >> 8;
+	        data[dst + 1] = dmabuf[src * ENVY24_REC_CHNUM + slot + 1].buffer >> 8;
 		dst += 2;
 		dst %= dsize;
 		src++;
 		src %= ssize;
 	}
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_POSTREAD);
 	
 	return;
 }
@@ -1699,15 +1706,17 @@ envy24_r16sl(struct sc_chinfo *ch)
 	dsize = ch->size / 2;
 	ssize = ch->size / 8;
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_PREREAD);
 
 	for (i = 0; i < length; i++) {
-	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 8;
-	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer >> 8;
+	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 16;
+	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer >> 16;
 		dst += 2;
 		dst %= dsize;
 		src++;
 		src %= ssize;
 	}
+	bus_dmapmap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_POSTREAD);
 	
 	return;
 }
@@ -2174,9 +2183,6 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 	if (dev == 0) {
 	  envy24_wrci(sc, ENVY24_CCI_PLVOL, ~(left & ENVY24_CCI_VOL_MASK));
 	  envy24_wrci(sc, ENVY24_CCI_PRVOL, ~(right & ENVY24_CCI_VOL_MASK));
-	  /*	for (i = 0; i < sc->dacn; i++) {
-			sc->cfg->codec->setvolume(sc->dac[i], PCMDIR_PLAY, left, right);
-			}*/
 	}
 	else {
 	  /* set volume value for hardware */
@@ -2239,7 +2245,6 @@ envy24hwmixer_init(struct snd_mixer *m)
 
 	mix_setdevs(m, ENVY24_MIX_MASK2);
 	mix_setrecdevs(m, ENVY24_MIX_REC_MASK2);
-	//mix_setparentchild(m, 0, 0x3F);
 	devs = mix_getdevs(m);
 	snd_mtxunlock(sc->lock);
 	return 0;
@@ -2276,8 +2281,6 @@ envy24hwmixer_uninit(struct snd_mixer *m)
 static int
 envy24hwmixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right)
 {
-        device_printf(sc->dev, "envy24hwmixer_set(m, %d, %d, %d)\n",
-	dev, left, right);
 	struct sc_info *sc = mix_getdevinfo(m);
 
 	if (sc == NULL)
@@ -2540,34 +2543,33 @@ envy24_dmafree(struct sc_info *sc)
 {
 #if(0)
 	device_printf(sc->dev, "envy24_dmafree():");
-	if (sc->rmap) printf(" sc->rmap(0x%016x)", (u_int32_t)sc->rmap);
+	if (sc->rmap) printf(" sc->rmap(0x%08x)", (u_int32_t)sc->rmap);
 	else printf(" sc->rmap(null)");
-	if (sc->pmap) printf(" sc->pmap(0x%016x)", (u_int32_t)sc->pmap);
+	if (sc->pmap) printf(" sc->pmap(0x%08x)", (u_int32_t)sc->pmap);
 	else printf(" sc->pmap(null)");
-	if (sc->rbuf) printf(" sc->rbuf(0x%016x)", (u_int32_t)sc->rbuf);
+	if (sc->rbuf) printf(" sc->rbuf(0x%08x)", (u_int32_t)sc->rbuf);
 	else printf(" sc->rbuf(null)");
-	if (sc->pbuf) printf(" sc->pbuf(0x%016x)\n", (u_int32_t)sc->pbuf);
+	if (sc->pbuf) printf(" sc->pbuf(0x%08x)\n", (u_int32_t)sc->pbuf);
 	else printf(" sc->pbuf(null)\n");
 #endif
 #if(0)
-	if (sc->rmap)
+	/*if (sc->rmap)
 		bus_dmamap_unload(sc->dmat, sc->rmap);
 	if (sc->pmap)
-		bus_dmamap_unload(sc->dmat, sc->pmap);
+	bus_dmamap_unload(sc->dmat, sc->pmap);*/
 	if (sc->rbuf)
 		bus_dmamem_free(sc->dmat, sc->rbuf, sc->rmap);
 	if (sc->pbuf)
 		bus_dmamem_free(sc->dmat, sc->pbuf, sc->pmap);
 #else
-	bus_dmamap_unload(sc->dmat, sc->pmap);
-	bus_dmamap_unload(sc->dmat, sc->rmap);
+	//bus_dmamap_unload(sc->dmat, sc->rmap);
+	//bus_dmamap_unload(sc->dmat, sc->pmap);
 	bus_dmamem_free(sc->dmat, sc->rbuf, sc->rmap);
 	bus_dmamem_free(sc->dmat, sc->pbuf, sc->pmap);
 #endif
 
 	
-	sc->rmap = NULL;
-	sc->pmap = NULL;
+	sc->rmap = sc->pmap = NULL;
 	sc->pbuf = NULL;
 	sc->rbuf = NULL;
 	
@@ -2594,14 +2596,14 @@ envy24_dmainit(struct sc_info *sc)
 #if(0)
 	device_printf(sc->dev, "envy24_dmainit(): bus_dmamem_alloc(): sc->pbuf\n");
 #endif
-	if (bus_dmamem_alloc(sc->dmat, (void **)&sc->pbuf, BUS_DMA_NOWAIT, &sc->pmap))
+	if (bus_dmamem_alloc(sc->dmat, (void **)&sc->pbuf, BUS_DMA_NOWAIT | BUS_DMA_COHERENT, &sc->pmap))
 		goto bad;
 #if(0)
 	device_printf(sc->dev, "envy24_dmainit(): bus_dmamem_alloc(): sc->rbuf\n");
 #endif
-	if (bus_dmamem_alloc(sc->dmat, (void **)&sc->rbuf, BUS_DMA_NOWAIT, &sc->rmap))
+	if (bus_dmamem_alloc(sc->dmat, (void **)&sc->rbuf, BUS_DMA_NOWAIT | BUS_DMA_COHERENT, &sc->rmap))
 		goto bad;
-#if(0)
+	/*#if(0)
 	device_printf(sc->dev, "envy24_dmainit(): bus_dmamem_load(): sc->pmap\n");
 #endif
 	if (bus_dmamap_load(sc->dmat, sc->pmap, sc->pbuf, sc->psize, envy24_dmapsetmap, sc, 0))
@@ -2610,7 +2612,7 @@ envy24_dmainit(struct sc_info *sc)
 	device_printf(sc->dev, "envy24_dmainit(): bus_dmamem_load(): sc->rmap\n");
 #endif
 	if (bus_dmamap_load(sc->dmat, sc->rmap, sc->rbuf, sc->rsize, envy24_dmarsetmap, sc, 0))
-		goto bad;
+	goto bad;*/
 	bzero(sc->pbuf, sc->psize);
 	bzero(sc->rbuf, sc->rsize);
 
@@ -2944,7 +2946,7 @@ envy24_pci_attach(device_t dev)
 
 	/* set multi track mixer */
 	mixer_init(dev, &envy24mixer_class, sc);
-	mixer_create(dev, &envy24hwmixer_class, sc, "mixer controlling hardware");
+	sc->sm = mixer_create(dev, &envy24hwmixer_class, sc, "mixer controlling hardware");
 	if(sc->sm == NULL){
 	        device_printf(dev,"unable to init secondary mixer\n");
 		goto bad;
@@ -3027,12 +3029,11 @@ envy24_pci_detach(device_t dev)
 	if(r)
 	        return r;
 	sc->sm = NULL;
-	envy24_dmafree(sc);
 	r = pcm_unregister(dev);
 	if (r)
 		return r;
 
-	//envy24_dmafree(sc);
+	envy24_dmafree(sc);
 	if (sc->cfg->codec->destroy != NULL) {
 		for (i = 0; i < sc->adcn; i++)
 			sc->cfg->codec->destroy(sc->adc[i]);
