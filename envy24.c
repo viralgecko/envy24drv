@@ -1564,7 +1564,7 @@ envy24_p32sl(struct sc_chinfo *ch)
 	dsize = ch->size / 8;
 	slot = ch->num * 2;
 	
-        bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
+        bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = data[src];
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = data[src + 1];
@@ -1573,7 +1573,7 @@ envy24_p32sl(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 	
 	return;
 }
@@ -1601,7 +1601,7 @@ envy24_p16sl(struct sc_chinfo *ch)
 #if(0)
 	device_printf(ch->parent->dev, "envy24_p16sl():%lu-->%lu(%lu)\n", src, dst, length);
 #endif
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = (u_int32_t)data[src] << 16;
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = (u_int32_t)data[src + 1] << 16;
@@ -1616,7 +1616,7 @@ envy24_p16sl(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 #if(0)
 	printf("\n");
 #endif
@@ -1642,7 +1642,7 @@ envy24_p8u(struct sc_chinfo *ch)
 	dsize = ch->size / 4;
 	slot = ch->num * 2;
 
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = ((u_int32_t)data[src] ^ 0x80) << 24;
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = ((u_int32_t)data[src + 1] ^ 0x80) << 24;
@@ -1651,7 +1651,7 @@ envy24_p8u(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 	
 	return;
 }
@@ -1674,7 +1674,7 @@ envy24_r32sl(struct sc_chinfo *ch)
 	ssize = ch->size / 8;
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 	src %= ssize;
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_PREREAD);
 
 	for (i = 0; i < length; i++) {
 	        data[dst] = dmabuf[src * ENVY24_REC_CHNUM + slot].buffer >> 8;
@@ -1684,7 +1684,7 @@ envy24_r32sl(struct sc_chinfo *ch)
 		src++;
 		src %= ssize;
 	}
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_POSTREAD);
 	
 	return;
 }
@@ -1706,7 +1706,7 @@ envy24_r16sl(struct sc_chinfo *ch)
 	dsize = ch->size / 2;
 	ssize = ch->size / 8;
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_PREREAD);
 
 	for (i = 0; i < length; i++) {
 	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 16;
@@ -1716,7 +1716,7 @@ envy24_r16sl(struct sc_chinfo *ch)
 		src++;
 		src %= ssize;
 	}
-	bus_dmapmap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_POSTREAD);
 	
 	return;
 }
