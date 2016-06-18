@@ -1563,7 +1563,7 @@ envy24_p32sl(struct sc_chinfo *ch)
 	dsize = ch->size / 8;
 	slot = ch->num * 2;
 	
-        bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
+        //bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = data[src];
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = data[src + 1];
@@ -1572,7 +1572,7 @@ envy24_p32sl(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
+	//bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 	
 	return;
 }
@@ -1600,7 +1600,7 @@ envy24_p16sl(struct sc_chinfo *ch)
 #if(0)
 	device_printf(ch->parent->dev, "envy24_p16sl():%lu-->%lu(%lu)\n", src, dst, length);
 #endif
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
+	//bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = (u_int32_t)data[src] << 16;
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = (u_int32_t)data[src + 1] << 16;
@@ -1615,7 +1615,7 @@ envy24_p16sl(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
+	//bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 #if(0)
 	printf("\n");
 #endif
@@ -1641,7 +1641,7 @@ envy24_p8u(struct sc_chinfo *ch)
 	dsize = ch->size / 4;
 	slot = ch->num * 2;
 
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
+	//bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
 	for (i = 0; i < length; i++) {
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot].buffer = ((u_int32_t)data[src] ^ 0x80) << 24;
 		dmabuf[dst * ENVY24_PLAY_CHNUM + slot + 1].buffer = ((u_int32_t)data[src + 1] ^ 0x80) << 24;
@@ -1650,7 +1650,7 @@ envy24_p8u(struct sc_chinfo *ch)
 		src += 2;
 		src %= ssize;
 	}
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
+	//bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_POSTWRITE);
 	
 	return;
 }
@@ -2100,6 +2100,110 @@ CHANNEL_DECLARE(envy24chan);
 /* mixer interface */
 
 static int
+envy24hwmixer_init(struct snd_mixer *m)
+{
+	struct sc_info *sc = mix_getdevinfo(m);
+	int devs;
+
+#if(0)
+	device_printf(sc->dev, "envy24hwmixer_init()\n");
+#endif
+	if (sc == NULL)
+		return -1;
+
+	/* set volume control rate */
+	snd_mtxlock(sc->lock);
+	envy24_wrmt(sc, ENVY24_MT_VOLRATE, 0x30, 1); /* 0x30 is default value */
+
+	mix_setdevs(m, ENVY24_MIX_MASK2);
+	mix_setrecdevs(m, ENVY24_MIX_REC_MASK2);
+	devs = mix_getdevs(m);
+	snd_mtxunlock(sc->lock);
+	return 0;
+}
+
+static int
+envy24hwmixer_reinit(struct snd_mixer *m)
+{
+	struct sc_info *sc = mix_getdevinfo(m);
+
+	if (sc == NULL)
+		return -1;
+#if(0)
+	device_printf(sc->dev, "envy24hwmixer_reinit()\n");
+#endif
+
+	return 0;
+}
+
+static int
+envy24hwmixer_uninit(struct snd_mixer *m)
+{
+	struct sc_info *sc = mix_getdevinfo(m);
+
+	if (sc == NULL)
+		return -1;
+#if(0)
+	device_printf(sc->dev, "envy24hwmixer_uninit()\n");
+#endif
+
+	return 0;
+}
+
+static int
+envy24hwmixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right)
+{
+	struct sc_info *sc = mix_getdevinfo(m);
+
+	if (sc == NULL)
+		return -1;
+	if (sc->cfg->codec->setvolume == NULL)
+		return -1;
+#if(1)
+	device_printf(sc->dev, "envy24hwmixer_set(m, %d, %d, %d)\n",
+	    dev, left, right);
+#endif
+
+
+	snd_mtxlock(sc->lock);
+	  if(dev < 4)
+	    sc->cfg->codec->setvolume(sc->dac[dev], PCMDIR_PLAY, left, right);
+	  else if( dev > 3 && dev < 7)
+	    sc->cfg->codec->setvolume(sc->adc[dev - 5], PCMDIR_REC, left, right);
+	snd_mtxunlock(sc->lock);
+
+	return right << 8 | left;
+}
+
+static u_int32_t
+envy24hwmixer_setrecsrc(struct snd_mixer *m, u_int32_t src)
+{
+	struct sc_info *sc = mix_getdevinfo(m);
+	u_int32_t work = src;
+	u_int32_t recsrc = 0;
+	while(work>>=1)
+	  recsrc++;
+	int ch = envy24_mixmap[recsrc];
+#if(0)
+	device_printf(sc->dev, "envy24hwmixer_setrecsrc(m, %d)\n", src);
+#endif
+
+	if (ch > ENVY24_CHAN_PLAY_SPDIF)
+		sc->src = ch;
+	return src;
+	}
+
+static kobj_method_t envy24hwmixer_methods[] = {
+	KOBJMETHOD(mixer_init,		envy24hwmixer_init),
+	KOBJMETHOD(mixer_reinit,	envy24hwmixer_reinit),
+	KOBJMETHOD(mixer_uninit,	envy24hwmixer_uninit),
+	KOBJMETHOD(mixer_set,		envy24hwmixer_set),
+	KOBJMETHOD(mixer_setrecsrc,	envy24hwmixer_setrecsrc),
+	KOBJMETHOD_END
+};
+MIXER_DECLARE(envy24hwmixer);
+
+static int
 envy24mixer_init(struct snd_mixer *m)
 {
 	struct sc_info *sc = mix_getdevinfo(m);
@@ -2112,6 +2216,8 @@ envy24mixer_init(struct snd_mixer *m)
 		return -1;
 
 	/* set volume control rate */
+	sc->sm = NULL;
+	sc->sm = mixer_create(sc->dev, &envy24hwmixer_class, sc, "mixer controlling hardware");
 	snd_mtxlock(sc->lock);
 	envy24_wrmt(sc, ENVY24_MT_VOLRATE, 0x30, 1); /* 0x30 is default value */
 
@@ -2174,7 +2280,6 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 	  hwch = envy24_chanmap[ch];
 	}
 	if(dev > 11) {
-	  device_printf(sc->dev, "envy24mixer_set(m, %d, %d, %d)\n",dev - 12, left, right);
 	  if(sc->sm)
 	          mix_set(sc->sm, dev - 12, left, right);
 	}
@@ -2226,113 +2331,6 @@ static kobj_method_t envy24mixer_methods[] = {
 	KOBJMETHOD_END
 };
 MIXER_DECLARE(envy24mixer);
-
-static int
-envy24hwmixer_init(struct snd_mixer *m)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-	int devs;
-
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_init()\n");
-#endif
-	if (sc == NULL)
-		return -1;
-
-	/* set volume control rate */
-	snd_mtxlock(sc->lock);
-	envy24_wrmt(sc, ENVY24_MT_VOLRATE, 0x30, 1); /* 0x30 is default value */
-
-	mix_setdevs(m, ENVY24_MIX_MASK2);
-	mix_setrecdevs(m, ENVY24_MIX_REC_MASK2);
-	devs = mix_getdevs(m);
-	snd_mtxunlock(sc->lock);
-	return 0;
-}
-
-static int
-envy24hwmixer_reinit(struct snd_mixer *m)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-
-	if (sc == NULL)
-		return -1;
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_reinit()\n");
-#endif
-
-	return 0;
-}
-
-static int
-envy24hwmixer_uninit(struct snd_mixer *m)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-
-	if (sc == NULL)
-		return -1;
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_uninit()\n");
-#endif
-
-	return 0;
-}
-
-static int
-envy24hwmixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right)
-{
-        if(m == NULL)
-	        return -1;
-	struct sc_info *sc = mix_getdevinfo(m);
-
-	if (sc == NULL)
-		return -1;
-	if (sc->cfg->codec->setvolume == NULL)
-		return -1;
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_set(m, %d, %d, %d)\n",
-	    dev, left, right);
-#endif
-
-
-	snd_mtxlock(sc->lock);
-	  if(dev < 4)
-	    sc->cfg->codec->setvolume(sc->dac[dev], PCMDIR_PLAY, left, right);
-	  else if( dev > 4 && dev < 9)
-	    sc->cfg->codec->setvolume(sc->dac[dev - 5], PCMDIR_REC, left, right);
-	snd_mtxunlock(sc->lock);
-
-	return right << 8 | left;
-}
-
-static u_int32_t
-envy24hwmixer_setrecsrc(struct snd_mixer *m, u_int32_t src)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-	u_int32_t work = src;
-	u_int32_t recsrc = 0;
-	while(work>>=1)
-	  recsrc++;
-	int ch = envy24_mixmap[recsrc];
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_setrecsrc(m, %d)\n", src);
-#endif
-
-	if (ch > ENVY24_CHAN_PLAY_SPDIF)
-		sc->src = ch;
-	return src;
-	}
-
-static kobj_method_t envy24hwmixer_methods[] = {
-	KOBJMETHOD(mixer_init,		envy24hwmixer_init),
-	KOBJMETHOD(mixer_reinit,	envy24hwmixer_reinit),
-	KOBJMETHOD(mixer_uninit,	envy24hwmixer_uninit),
-	KOBJMETHOD(mixer_set,		envy24hwmixer_set),
-	KOBJMETHOD(mixer_setrecsrc,	envy24hwmixer_setrecsrc),
-	KOBJMETHOD_END
-};
-MIXER_DECLARE(envy24hwmixer);
-
 
 /* -------------------------------------------------------------------- */
 
@@ -2941,14 +2939,8 @@ envy24_pci_attach(device_t dev)
 	}
 
 	/* set multi track mixer */
-	sc->sm = NULL;
 	mixer_init(dev, &envy24mixer_class, sc);
-	sc->sm = mixer_create(dev, &envy24hwmixer_class, sc, "mixer controlling hardware");
-	if(sc->sm == NULL){
-	        device_printf(dev,"unable to init secondary mixer\n");
-		goto bad;
-	}
-
+	
 	/* set channel information */
 	err = pcm_register(dev, sc, 5, 2 + sc->adcn);
 	if (err)
