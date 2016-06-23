@@ -2169,7 +2169,7 @@ envy24hwmixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned rig
 	  if(dev < 4)
 	    sc->cfg->codec->setvolume(sc->dac[dev], PCMDIR_PLAY, left, right);
 	  else if( dev > 3 && dev < 7)
-	    sc->cfg->codec->setvolume(sc->adc[dev - 5], PCMDIR_REC, left, right);
+	    sc->cfg->codec->setvolume(sc->adc[dev - 4], PCMDIR_REC, left, right);
 	snd_mtxunlock(sc->lock);
 
 	return right << 8 | left;
@@ -2218,6 +2218,8 @@ envy24mixer_init(struct snd_mixer *m)
 	/* set volume control rate */
 	sc->sm = NULL;
 	sc->sm = mixer_create(sc->dev, &envy24hwmixer_class, sc, "mixer controlling hardware");
+	if(sc->sm == NULL)
+	  return -1;
 	snd_mtxlock(sc->lock);
 	envy24_wrmt(sc, ENVY24_MT_VOLRATE, 0x30, 1); /* 0x30 is default value */
 
