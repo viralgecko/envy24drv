@@ -2249,12 +2249,17 @@ static int
 envy24mixer_uninit(struct snd_mixer *m)
 {
 	struct sc_info *sc = mix_getdevinfo(m);
+	int r;
 
 	if (sc == NULL)
 		return -1;
 #if(0)
 	device_printf(sc->dev, "envy24mixer_uninit()\n");
 #endif
+	r = mixer_delete(sc->sm);
+	if(r)
+	        return r;
+	sc->sm = NULL;
 
 	return 0;
 }
@@ -2796,10 +2801,8 @@ envy24_init(struct sc_info *sc)
 #if(0)
 	device_printf(sc->dev, "envy24_init(): initialize DMA buffer\n");
 #endif
-	if (envy24_dmainit(sc)){
-	  device_printf(sc->dev, "envy24_init(): initialize DMA buffer\n");
+	if (envy24_dmainit(sc))
 		return ENOSPC;
-	}
 
 	/* initialize status */
 	sc->run[0] = sc->run[1] = 0;
@@ -2942,7 +2945,7 @@ envy24_pci_attach(device_t dev)
 
 	/* set multi track mixer */
 	mixer_init(dev, &envy24mixer_class, sc);
-	
+
 	/* set channel information */
 	err = pcm_register(dev, sc, 5, 2 + sc->adcn);
 	if (err)
@@ -2974,7 +2977,6 @@ envy24_pci_attach(device_t dev)
 	return 0;
 
 bad:
-	device_printf(sc->dev, "envy24_pci_attach(): Error during attach of pci device\n");
 	if (sc->ih)
 		bus_teardown_intr(dev, sc->irq, sc->ih);
 	if (sc->irq)
@@ -3016,10 +3018,6 @@ envy24_pci_detach(device_t dev)
 	sc = pcm_getdevinfo(dev);
 	if (sc == NULL)
 		return 0;
-	r = mixer_delete(sc->sm);
-	if(r)
-	        return r;
-	sc->sm = NULL;
 	r = pcm_unregister(dev);
 	if (r)
 		return r;
