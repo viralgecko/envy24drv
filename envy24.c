@@ -2568,6 +2568,10 @@ envy24_dmafree(struct sc_info *sc)
 	if (sc->pbuf)
 		bus_dmamem_free(sc->dmat, sc->pbuf, sc->pmap);
 #else
+	device_printf(sc->dev,"show me the needed pages for rec: %i\n", (&sc->rmap)->pagesneeded);
+	device_printf(sc->dev,"show me the reserved pages for rec: %i\n", (&sc->rmap)->pagesreserved);
+	device_printf(sc->dev,"show me the needed pages for play: %i\n", (&sc->pmap)->pagesneeded);
+	device_printf(sc->dev,"show me the reserved pages for play: %i\n", (&sc->pmap)->pagesreserved);
 	bus_dmamap_unload(sc->dmat, sc->rmap);
 	bus_dmamap_unload(sc->dmat, sc->pmap);
 	bus_dmamem_free(sc->dmat, sc->rbuf, sc->rmap);
