@@ -39,6 +39,7 @@
 #include <dev/pci/pcivar.h>
 
 #include "mixer_if.h"
+#include <sys/memdesc.h>
 
 SND_DECLARE_FILE("$FreeBSD: head/sys/dev/sound/pci/envy24.c 297000 2016-03-18 01:28:41Z jhibbits $");
 
@@ -62,6 +63,17 @@ struct sc_info;
 
 #define SDA_GPIO 0x10
 #define SCL_GPIO 0x20
+
+struct bus_dmamap {
+        STAILQ_HEAD(bp_list, bounce_page)       bpages;
+	int		       pagesneeded;
+	int		       pagesreserved;
+	bus_dma_tag_t	       dmat;
+	struct memdesc	       mem;
+	bus_dmamap_callback_t *callback;
+	void		      *callback_arg;
+	STAILQ_ENTRY(bus_dmamap) links;
+};
 
 struct envy24_sample {
         volatile u_int32_t buffer;
@@ -2568,10 +2580,10 @@ envy24_dmafree(struct sc_info *sc)
 	if (sc->pbuf)
 		bus_dmamem_free(sc->dmat, sc->pbuf, sc->pmap);
 #else
-	device_printf(sc->dev,"show me the needed pages for rec: %i\n", (&sc->rmap)->pagesneeded);
-	device_printf(sc->dev,"show me the reserved pages for rec: %i\n", (&sc->rmap)->pagesreserved);
-	device_printf(sc->dev,"show me the needed pages for play: %i\n", (&sc->pmap)->pagesneeded);
-	device_printf(sc->dev,"show me the reserved pages for play: %i\n", (&sc->pmap)->pagesreserved);
+	device_printf(sc->dev,"show me the needed pages for rec: %i\n", sc->rmap->pagesneeded);
+	device_printf(sc->dev,"show me the reserved pages for rec: %i\n", sc->rmap->pagesreserved);
+	device_printf(sc->dev,"show me the needed pages for play: %i\n", sc->pmap->pagesneeded);
+	device_printf(sc->dev,"show me the reserved pages for play: %i\n", sc->pmap->pagesreserved);
 	bus_dmamap_unload(sc->dmat, sc->rmap);
 	bus_dmamap_unload(sc->dmat, sc->pmap);
 	bus_dmamem_free(sc->dmat, sc->rbuf, sc->rmap);
