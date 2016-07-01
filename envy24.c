@@ -39,7 +39,6 @@
 #include <dev/pci/pcivar.h>
 
 #include "mixer_if.h"
-#include <sys/memdesc.h>
 
 SND_DECLARE_FILE("$FreeBSD: head/sys/dev/sound/pci/envy24.c 297000 2016-03-18 01:28:41Z jhibbits $");
 
@@ -63,17 +62,6 @@ struct sc_info;
 
 #define SDA_GPIO 0x10
 #define SCL_GPIO 0x20
-
-struct bus_dmamap {
-        STAILQ_HEAD(bp_list, bounce_page)       bpages;
-	int		       pagesneeded;
-	int		       pagesreserved;
-	bus_dma_tag_t	       dmat;
-	struct memdesc	       mem;
-	bus_dmamap_callback_t *callback;
-	void		      *callback_arg;
-	STAILQ_ENTRY(bus_dmamap) links;
-};
 
 struct envy24_sample {
         volatile u_int32_t buffer;
@@ -2158,43 +2146,39 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 	struct sc_info *sc = mix_getdevinfo(m);
 	int ch = envy24_mixmap[dev];
 	int hwch;
-	//int i;
+	int i;
 
 	if (sc == NULL)
 		return -1;
 	if (dev == 0 && sc->cfg->codec->setvolume == NULL)
 		return -1;
+	if (dev != 0 && ch == -1)
+		return -1;
+	if (ch > 10)
+	  return 0;
+	hwch = envy24_chanmap[ch];
 #if(0)
 	device_printf(sc->dev, "envy24mixer_set(m, %d, %d, %d)\n",
 	    dev, left, right);
 #endif
 
-	if (dev != 0 && ch == -1)
-		return -1;
 	snd_mtxlock(sc->lock);
-	if(ch < 12) {
-	  hwch = envy24_chanmap[ch];
-	}
-	else if(12 < ch && ch < 16) {
-	  sc->cfg->codec->setvolume(sc->dac[ch - 12], PCMDIR_PLAY, left, right);
-	}
-	else if(15 < ch && ch < 20) {
-	  sc->cfg->codec->setvolume(sc->adc[ch - 16], PCMDIR_PLAY, left, right);
-	}
 	if (dev == 0) {
-	  envy24_wrci(sc, ENVY24_CCI_PLVOL, ~(left & ENVY24_CCI_VOL_MASK));
-	  envy24_wrci(sc, ENVY24_CCI_PRVOL, ~(right & ENVY24_CCI_VOL_MASK));
+		for (i = 0; i < sc->dacn; i++) {
+			sc->cfg->codec->setvolume(sc->dac[i], PCMDIR_PLAY, left, right);
+		}
 	}
 	else {
-	  /* set volume value for hardware */
-	  if ((sc->left[hwch] = 100 - left) > ENVY24_VOL_MIN)
-		sc->left[hwch] = ENVY24_VOL_MUTE;
-	  if ((sc->right[hwch] = 100 - right) > ENVY24_VOL_MIN)
-		sc->right[hwch] = ENVY24_VOL_MUTE;
-  	  /* set volume for record channel and running play channel */
-	  if (hwch > ENVY24_CHAN_PLAY_SPDIF || sc->chan[ch].run)
-		envy24_setvolume(sc, hwch);
-       }
+		/* set volume value for hardware */
+		if ((sc->left[hwch] = 100 - left) > ENVY24_VOL_MIN)
+			sc->left[hwch] = ENVY24_VOL_MUTE;
+		if ((sc->right[hwch] = 100 - right) > ENVY24_VOL_MIN)
+			sc->right[hwch] = ENVY24_VOL_MUTE;
+
+		/* set volume for record channel and running play channel */
+		if (hwch > ENVY24_CHAN_PLAY_SPDIF || sc->chan[ch].run)
+			envy24_setvolume(sc, hwch);
+	}
 	snd_mtxunlock(sc->lock);
 
 	return right << 8 | left;
@@ -2439,10 +2423,6 @@ envy24_dmafree(struct sc_info *sc)
 	if (sc->pbuf)
 		bus_dmamem_free(sc->dmat, sc->pbuf, sc->pmap);
 #else
-	device_printf(sc->dev,"show me the needed pages for rec: %i\n", sc->rmap->pagesneeded);
-	device_printf(sc->dev,"show me the reserved pages for rec: %i\n", sc->rmap->pagesreserved);
-	device_printf(sc->dev,"show me the needed pages for play: %i\n", sc->pmap->pagesneeded);
-	device_printf(sc->dev,"show me the reserved pages for play: %i\n", sc->pmap->pagesreserved);
 	bus_dmamap_unload(sc->dmat, sc->rmap);
 	bus_dmamap_unload(sc->dmat, sc->pmap);
 	bus_dmamem_free(sc->dmat, sc->rbuf, sc->rmap);
