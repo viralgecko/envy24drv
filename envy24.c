@@ -187,9 +187,6 @@ struct sc_info {
 	/* channel info table */
 	unsigned	chnum;
 	struct sc_chinfo chan[11];
-
-        /* secondary mixer */
-        struct snd_mixer *sm;
 };
 
 /* -------------------------------------------------------------------- */
@@ -220,13 +217,6 @@ static int envy24mixer_reinit(struct snd_mixer *);
 static int envy24mixer_uninit(struct snd_mixer *);
 static int envy24mixer_set(struct snd_mixer *, unsigned, unsigned, unsigned);
 static u_int32_t envy24mixer_setrecsrc(struct snd_mixer *, u_int32_t);
-
-static int envy24hwmixer_init(struct snd_mixer *);
-static int envy24hwmixer_reinit(struct snd_mixer *);
-static int envy24hwmixer_uninit(struct snd_mixer *);
-static int envy24hwmixer_set(struct snd_mixer *, unsigned, unsigned, unsigned);
-static u_int32_t envy24hwmixer_setrecsrc(struct snd_mixer *, u_int32_t);
-
 
 /* M-Audio Delta series AK4524 access interface */
 static void *envy24_delta_ak4524_create(device_t, void *, int, int);
@@ -277,15 +267,15 @@ static int envy24_mixmap[] = {
 	6,  /* alternative codec */
 	5, /* global recording level */
 	12, /* Input gain */
-	12, /* Output gain */
-	12,  /* Input source 1 */
-	12,  /* Input source 2 */
-	12, /* Input source 3 */
-	12,  /* Digital (input) 1 */
-	12, /* Digital (input) 2 */
-	12, /* Digital (input) 3 */
-	12, /* Phone input */
-	12, /* Phone output */
+	13, /* Output gain */
+	14,  /* Input source 1 */
+	15,  /* Input source 2 */
+	16, /* Input source 3 */
+	17,  /* Digital (input) 1 */
+	18, /* Digital (input) 2 */
+	19, /* Digital (input) 3 */
+	-1, /* Phone input */
+	-1, /* Phone output */
 	-1, /* Video/TV (audio) in */
 	-1, /* Radio in */
 	-1, /* Monitor volume */
@@ -2110,111 +2100,6 @@ CHANNEL_DECLARE(envy24chan);
 /* -------------------------------------------------------------------- */
 
 /* mixer interface */
-
-static int
-envy24hwmixer_init(struct snd_mixer *m)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-	int devs;
-
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_init()\n");
-#endif
-	if (sc == NULL)
-		return -1;
-
-	/* set volume control rate */
-	snd_mtxlock(sc->lock);
-	envy24_wrmt(sc, ENVY24_MT_VOLRATE, 0x30, 1); /* 0x30 is default value */
-
-	mix_setdevs(m, ENVY24_MIX_MASK2);
-	mix_setrecdevs(m, ENVY24_MIX_REC_MASK2);
-	devs = mix_getdevs(m);
-	snd_mtxunlock(sc->lock);
-	return 0;
-}
-
-static int
-envy24hwmixer_reinit(struct snd_mixer *m)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-
-	if (sc == NULL)
-		return -1;
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_reinit()\n");
-#endif
-
-	return 0;
-}
-
-static int
-envy24hwmixer_uninit(struct snd_mixer *m)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-
-	if (sc == NULL)
-		return -1;
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_uninit()\n");
-#endif
-
-	return 0;
-}
-
-static int
-envy24hwmixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-
-	if (sc == NULL)
-		return -1;
-	if (sc->cfg->codec->setvolume == NULL)
-		return -1;
-#if(1)
-	device_printf(sc->dev, "envy24hwmixer_set(m, %d, %d, %d)\n",
-	    dev, left, right);
-#endif
-
-
-	snd_mtxlock(sc->lock);
-	  if(dev < 4)
-	    sc->cfg->codec->setvolume(sc->dac[dev], PCMDIR_PLAY, left, right);
-	  else if( dev > 3 && dev < 7)
-	    sc->cfg->codec->setvolume(sc->adc[dev - 4], PCMDIR_REC, left, right);
-	snd_mtxunlock(sc->lock);
-
-	return right << 8 | left;
-}
-
-static u_int32_t
-envy24hwmixer_setrecsrc(struct snd_mixer *m, u_int32_t src)
-{
-	struct sc_info *sc = mix_getdevinfo(m);
-	u_int32_t work = src;
-	u_int32_t recsrc = 0;
-	while(work>>=1)
-	  recsrc++;
-	int ch = envy24_mixmap[recsrc];
-#if(0)
-	device_printf(sc->dev, "envy24hwmixer_setrecsrc(m, %d)\n", src);
-#endif
-
-	if (ch > ENVY24_CHAN_PLAY_SPDIF)
-		sc->src = ch;
-	return src;
-	}
-
-static kobj_method_t envy24hwmixer_methods[] = {
-	KOBJMETHOD(mixer_init,		envy24hwmixer_init),
-	KOBJMETHOD(mixer_reinit,	envy24hwmixer_reinit),
-	KOBJMETHOD(mixer_uninit,	envy24hwmixer_uninit),
-	KOBJMETHOD(mixer_set,		envy24hwmixer_set),
-	KOBJMETHOD(mixer_setrecsrc,	envy24hwmixer_setrecsrc),
-	KOBJMETHOD_END
-};
-MIXER_DECLARE(envy24hwmixer);
-
 static int
 envy24mixer_init(struct snd_mixer *m)
 {
@@ -2228,10 +2113,6 @@ envy24mixer_init(struct snd_mixer *m)
 		return -1;
 
 	/* set volume control rate */
-	sc->sm = NULL;
-	sc->sm = mixer_create(sc->dev, &envy24hwmixer_class, sc, "mixer controlling hardware");
-	if(sc->sm == NULL)
-	  return -1;
 	snd_mtxlock(sc->lock);
 	envy24_wrmt(sc, ENVY24_MT_VOLRATE, 0x30, 1); /* 0x30 is default value */
 
@@ -2261,18 +2142,13 @@ static int
 envy24mixer_uninit(struct snd_mixer *m)
 {
 	struct sc_info *sc = mix_getdevinfo(m);
-	int r;
-
+	
 	if (sc == NULL)
 		return -1;
 #if(0)
 	device_printf(sc->dev, "envy24mixer_uninit()\n");
 #endif
-	r = mixer_delete(sc->sm);
-	if(r)
-	        return r;
-	sc->sm = NULL;
-
+	
 	return 0;
 }
 
@@ -2295,15 +2171,16 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 
 	if (dev != 0 && ch == -1)
 		return -1;
+	snd_mtxlock(sc->lock);
 	if(ch < 12) {
 	  hwch = envy24_chanmap[ch];
 	}
-	if(dev > 11) {
-	  if(sc->sm)
-	          mix_set(sc->sm, dev - 12, left, right);
+	else if(12 < ch && ch < 16) {
+	  sc->cfg->codec->setvolume(sc->dac[ch - 12], PCMDIR_PLAY, left, right);
 	}
-
-	snd_mtxlock(sc->lock);
+	else if(15 < ch && ch < 20) {
+	  sc->cfg->codec->setvolume(sc->adc[ch - 16], PCMDIR_PLAY, left, right);
+	}
 	if (dev == 0) {
 	  envy24_wrci(sc, ENVY24_CCI_PLVOL, ~(left & ENVY24_CCI_VOL_MASK));
 	  envy24_wrci(sc, ENVY24_CCI_PRVOL, ~(right & ENVY24_CCI_VOL_MASK));
@@ -2400,24 +2277,6 @@ sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
     envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
   return 0;
 }
-
-/*static int
-sysctl_dev_pcm_mixer(SYSCTL_HANDLER_ARGS)
-{
-  int mix;
-  int error;
-  struct sc_info *sc;
-  sc = oidp->oid_arg1;
-  error = sysctl_handle_int(oidp, &mix, 0, req);
-  if(error)
-    return error;
-  if( mix < 0 || mix > 1)
-    return EINVAL;
-  mixer = mix;
-  return 0;
-  }*/
-
-
 
 /* -------------------------------------------------------------------- */
 
