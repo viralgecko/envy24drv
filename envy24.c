@@ -2154,21 +2154,22 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 		return -1;
 	if (dev != 0 && ch == -1)
 		return -1;
-	if (ch > 10)
-	  return 0;
-	hwch = envy24_chanmap[ch];
+	if (ch < 11)
+	        hwch = envy24_chanmap[ch];
 #if(0)
 	device_printf(sc->dev, "envy24mixer_set(m, %d, %d, %d)\n",
 	    dev, left, right);
 #endif
 
 	snd_mtxlock(sc->lock);
-	if (dev == 0) {
-		for (i = 0; i < sc->dacn; i++) {
+	if (10 < ch && ch < 15) {
+	  i = ch - 11;
+	  sc->cfg->codec->setvolume(sc->dac[i], PCMDIR_PLAY, left, right);
+	  /*	for (i = 0; i < sc->dacn; i++) {
 			sc->cfg->codec->setvolume(sc->dac[i], PCMDIR_PLAY, left, right);
-		}
+			}*/
 	}
-	else {
+	else if(0 < ch && ch < 11) {
 		/* set volume value for hardware */
 		if ((sc->left[hwch] = 100 - left) > ENVY24_VOL_MIN)
 			sc->left[hwch] = ENVY24_VOL_MUTE;
