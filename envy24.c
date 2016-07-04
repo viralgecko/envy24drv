@@ -254,14 +254,14 @@ static int envy24_mixmap[] = {
 	10, /* Recording monitor */
 	6,  /* alternative codec */
 	5, /* global recording level */
-	12, /* Input gain */
-	13, /* Output gain */
-	14,  /* Input source 1 */
-	15,  /* Input source 2 */
-	16, /* Input source 3 */
-	17,  /* Digital (input) 1 */
-	18, /* Digital (input) 2 */
-	19, /* Digital (input) 3 */
+	11, /* Input gain */
+	12, /* Output gain */
+	13,  /* Input source 1 */
+	14,  /* Input source 2 */
+	15, /* Input source 3 */
+	16,  /* Digital (input) 1 */
+	17, /* Digital (input) 2 */
+	18, /* Digital (input) 3 */
 	-1, /* Phone input */
 	-1, /* Phone output */
 	-1, /* Video/TV (audio) in */
@@ -1518,6 +1518,7 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
      int i = 0;
 #if(0)
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume(viod *codec, %i, %u, %u)\n",dir,left,right);
+     device_printf(sc->dev,"envy24_esp_ak4358_setvolume: adress=%x\n",a);
 #endif
      if( dir == PCMDIR_REC && ptr->num == 1)
 	 device_printf(sc->dev,"Preamp control not implemented yet\n");
@@ -2106,7 +2107,7 @@ envy24mixer_init(struct snd_mixer *m)
 
 	mix_setdevs(m, ENVY24_MIX_MASK);
 	mix_setrecdevs(m, ENVY24_MIX_REC_MASK);
-	mix_setparentchild(m, 0, 0x3F);
+	mix_setparentchild(m, 0, 0xF03F);
 	devs = mix_getdevs(m);
 	snd_mtxunlock(sc->lock);
 	return 0;
