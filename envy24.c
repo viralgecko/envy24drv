@@ -1103,6 +1103,45 @@ envy24_delta_ak4524_setvolume(void *codec, int dir, unsigned int left, unsigned 
 
 /* -------------------------------------------------------------------- */
 
+/* esi esp 1010 cpld control routeines */
+
+static int
+cpldwr(struct sc_info *sc, char addr, char data)
+{
+  char gpio;
+  char mask;
+  char dir;
+  char help = 0;
+  int i;
+  mask = envy24_gpiogetmask(sc);
+  if(mask & 0x3)
+    return -1;
+  dir = envy24_gpiogetdir(sc);
+  if(!(dir & 0x3))
+    return -2;
+  gpio = envy24_gpiord(sc);
+  envy24_gpiowr(sc, gpio | 0x03);
+  DELAY(10);
+  for(i = 0; i < 8; i++){
+    help = (addr >> i) & 0x01;
+    evny24_gpiowr(sc, (gpio | help) ^ 0x02);
+    DELAY(1);
+    envy24_gpiowr(sc, gpio ^ 0x02);
+    DELAY(1);
+  }
+    for(i = 0; i < 8; i++){
+    help = (data >> i) & 0x01;
+    evny24_gpiowr(sc, (gpio | help) ^ 0x02);
+    DELAY(1);
+    envy24_gpiowr(sc, gpio ^ 0x02);
+    DELAY(1);
+  }
+    envy24_gpiowr(sc, gpio | 0x3);
+    return 0;
+}
+
+/* -------------------------------------------------------------------- */
+
 /* hardware access routeines */
 
 static struct {
@@ -2264,6 +2303,39 @@ sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
   return 0;
 }
 
+static int
+sysctl_dev_pcm_hp(SYSCTL_HANDLER_ARGS)
+{
+  int en;
+  int error;
+  struct sc_info *sc;
+  sc = oidp->oid_arg1;
+  if(sc == NULL)
+    return -1;
+  error = sysctl_handle_int(oidp, &en, 0, req);
+  if(error || req->newptr == NULL)
+    return error;
+  if( en < 0 || en > 1)
+    return EINVAL;
+  if(en)
+    {
+      if(cpldwr(sc, HP_ADDR, HP_ON_F))
+	return -1;
+      DELAY(9);
+      if(cpldwr(sc, HP_ADDR, HP_ON_L))
+	return -1;
+    }
+  else
+    {
+      if(cpldwr(sc, HP_ADDR, HP_OFF_F))
+	return -1;
+      DELAY(9);
+      if(cpldwr(sc, HP_ADDR, HP_OFF_L))
+	return -1;
+    }
+  return 0;
+}
+
 /* -------------------------------------------------------------------- */
 
 /* The interrupt handler */
@@ -2674,10 +2746,13 @@ envy24_init(struct sc_info *sc)
 	/* envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0); */
         clist = device_get_sysctl_ctx(sc->dev);
 	oid = device_get_sysctl_tree(sc->dev);
-        /*SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
-	  OID_AUTO, "mixer_ctl", CTLTYPE_INT | CTLFLAG_RW,
-	  sc, 0,
-	  sysctl_dev_pcm_mixer, "I", "0 : codec, 1: controler");*/
+	if(sc->cfg->subvendor==0x4154 && sc->cfg->subdevice==0x3131)
+	  {
+	    SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
+  	      OID_AUTO, "hp_ctl", CTLTYPE_INT | CTLFLAG_RW,
+	      sc, 0,
+	      sysctl_dev_pcm_hp, "I", "Enable the Headphones");
+	  }
         SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
 	  OID_AUTO, "mix_to_ch1", CTLTYPE_INT | CTLFLAG_RW,
 	  sc, 0,
