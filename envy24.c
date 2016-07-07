@@ -175,6 +175,11 @@ struct sc_info {
 	/* channel info table */
 	unsigned	chnum;
 	struct sc_chinfo chan[11];
+
+        /* sysctl vars */
+        int ch1;
+        int spdif;
+        int hp;
 };
 
 /* -------------------------------------------------------------------- */
@@ -370,8 +375,8 @@ static struct cfg_info cfg_table[] = {
 		{
 		"Envy24 audio (ESI ESP1010)",
 		0x4154, 0x3131,
-		0x0f, 0x00, 0x01, 0x03,
-		0xff, 0x00, 0x00,
+		0x3f, 0x80, 0x70, 0x03,
+		0xc4, 0x39, 0x3b,
 		0x10, 0x20, 0x40, 0x00, 0x00,
 		0x00,
 		&esp_codec,
@@ -421,7 +426,6 @@ static struct envy24_emldma envy24_remltab[] = {
 	{SND_FORMAT(AFMT_S32_LE, 2, 0), envy24_r32sl, 8},
 	{0, NULL, 0}
 };
-
 
 /* -------------------------------------------------------------------- */
 
@@ -787,7 +791,7 @@ envy24_gpiowr(struct sc_info *sc, u_int32_t data)
 	return;
 }
 
-#if 0
+#if 1
 static u_int32_t
 envy24_gpiogetmask(struct sc_info *sc)
 {
@@ -802,7 +806,7 @@ envy24_gpiosetmask(struct sc_info *sc, u_int32_t mask)
 	return;
 }
 
-#if 0
+#if 1
 static u_int32_t
 envy24_gpiogetdir(struct sc_info *sc)
 {
@@ -1106,12 +1110,13 @@ envy24_delta_ak4524_setvolume(void *codec, int dir, unsigned int left, unsigned 
 /* esi esp 1010 cpld control routeines */
 
 static int
-cpldwr(struct sc_info *sc, char addr, char data)
+cpldwr(struct sc_info *sc, uint8_t addr, uint8_t data)
 {
-  char gpio;
-  char mask;
-  char dir;
-  char help = 0;
+  uint8_t gpio;
+  uint8_t mask;
+  uint8_t dir;
+  uint8_t help = 0;
+  uint8_t temp;
   int i;
   mask = envy24_gpiogetmask(sc);
   if(mask & 0x3)
@@ -1121,20 +1126,24 @@ cpldwr(struct sc_info *sc, char addr, char data)
     return -2;
   gpio = envy24_gpiord(sc);
   envy24_gpiowr(sc, gpio | 0x03);
-  DELAY(10);
+  DELAY(32);
   for(i = 0; i < 8; i++){
-    help = (addr >> i) & 0x01;
-    evny24_gpiowr(sc, (gpio | help) ^ 0x02);
-    DELAY(1);
-    envy24_gpiowr(sc, gpio ^ 0x02);
-    DELAY(1);
+    help = (addr >> (7 - i)) & 0x01;
+    temp = (gpio & 0xFC) | (help & (~0x02));
+    envy24_gpiowr(sc, temp);
+    DELAY(16);
+    temp = (gpio & 0xFC) | (help | 0x02);
+    envy24_gpiowr(sc, temp);
+    DELAY(16);
   }
-    for(i = 0; i < 8; i++){
-    help = (data >> i) & 0x01;
-    evny24_gpiowr(sc, (gpio | help) ^ 0x02);
-    DELAY(1);
-    envy24_gpiowr(sc, gpio ^ 0x02);
-    DELAY(1);
+  for(i = 0; i < 8; i++){
+    help = (data >> (7 - i)) & 0x01;
+    temp = (gpio & 0xFC) | (help & (~0x02));
+    envy24_gpiowr(sc, temp);
+    DELAY(16);
+    temp = (gpio & 0xFC) | (help | 0x02);
+    envy24_gpiowr(sc, temp);
+    DELAY(16);
   }
     envy24_gpiowr(sc, gpio | 0x3);
     return 0;
@@ -2266,6 +2275,7 @@ sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
   sc = oidp->oid_arg1;
   if(sc == NULL)
     return -1;
+  en = sc->ch1;
   error = sysctl_handle_int(oidp, &en, 0, req);
   if(error || req->newptr == NULL)
     return error;
@@ -2276,19 +2286,23 @@ sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
       envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
     }
   else
-    envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+    {
+      envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+    }
+  sc->ch1 = en;
   return 0;
 }
 
 static int
 sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
 {
-  int en;
+  int en = 0;
   int error;
   struct sc_info *sc;
   sc = oidp->oid_arg1;
   if(sc == NULL)
     return -1;
+  en = sc->spdif;
   error = sysctl_handle_int(oidp, &en, 0, req);
   if(error || req->newptr == NULL)
     return error;
@@ -2300,18 +2314,20 @@ sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
     }
   else
     envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+  sc->spdif = en;
   return 0;
 }
 
 static int
 sysctl_dev_pcm_hp(SYSCTL_HANDLER_ARGS)
 {
-  int en;
+  int en = 0;
   int error;
   struct sc_info *sc;
   sc = oidp->oid_arg1;
   if(sc == NULL)
     return -1;
+  en = sc->hp;
   error = sysctl_handle_int(oidp, &en, 0, req);
   if(error || req->newptr == NULL)
     return error;
@@ -2321,7 +2337,7 @@ sysctl_dev_pcm_hp(SYSCTL_HANDLER_ARGS)
     {
       if(cpldwr(sc, HP_ADDR, HP_ON_F))
 	return -1;
-      DELAY(9);
+      DELAY(64);
       if(cpldwr(sc, HP_ADDR, HP_ON_L))
 	return -1;
     }
@@ -2329,10 +2345,11 @@ sysctl_dev_pcm_hp(SYSCTL_HANDLER_ARGS)
     {
       if(cpldwr(sc, HP_ADDR, HP_OFF_F))
 	return -1;
-      DELAY(9);
+      DELAY(64);
       if(cpldwr(sc, HP_ADDR, HP_OFF_L))
 	return -1;
     }
+  sc->hp = en;
   return 0;
 }
 
@@ -2419,8 +2436,8 @@ envy24_pci_probe(device_t dev)
 #endif
 	if (pci_get_device(dev) == PCID_ENVY24 &&
 	    pci_get_vendor(dev) == PCIV_ENVY24) {
-		sv = pci_get_subvendor(dev);
-		sd = pci_get_subdevice(dev);
+		sd = pci_get_subvendor(dev);
+		sv = pci_get_subdevice(dev);
 		for (i = 0; cfg_table[i].subvendor != 0 || cfg_table[i].subdevice != 0; i++) {
 			if (cfg_table[i].subvendor == sv &&
 			    cfg_table[i].subdevice == sd) {
@@ -2744,12 +2761,15 @@ envy24_init(struct sc_info *sc)
 	envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
 	envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
 	/* envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0); */
+	sc->ch1 = 1;
+	sc->spdif = 0;
+	sc->hp = 0;
         clist = device_get_sysctl_ctx(sc->dev);
 	oid = device_get_sysctl_tree(sc->dev);
 	if(sc->cfg->subvendor==0x4154 && sc->cfg->subdevice==0x3131)
 	  {
 	    SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
-  	      OID_AUTO, "hp_ctl", CTLTYPE_INT | CTLFLAG_RW,
+  	      OID_AUTO, "hp", CTLTYPE_INT | CTLFLAG_RW,
 	      sc, 0,
 	      sysctl_dev_pcm_hp, "I", "Enable the Headphones");
 	  }
