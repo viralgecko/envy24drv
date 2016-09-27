@@ -175,6 +175,8 @@ struct sc_info {
 	/* channel info table */
 	unsigned	chnum;
 	struct sc_chinfo chan[11];
+        int             mixtoch = 1;
+        int             mixtospdif = 0;
 };
 
 /* -------------------------------------------------------------------- */
@@ -2227,6 +2229,7 @@ sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
   sc = oidp->oid_arg1;
   if(sc == NULL)
     return -1;
+  en = sc->mixtoch;
   error = sysctl_handle_int(oidp, &en, 0, req);
   if(error || req->newptr == NULL)
     return error;
@@ -2238,6 +2241,7 @@ sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
     }
   else
     envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+  sc->mixtoch = en;
   return 0;
 }
 
@@ -2250,6 +2254,7 @@ sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
   sc = oidp->oid_arg1;
   if(sc == NULL)
     return -1;
+  en = sc->mixtospdif;
   error = sysctl_handle_int(oidp, &en, 0, req);
   if(error || req->newptr == NULL)
     return error;
@@ -2261,6 +2266,7 @@ sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
     }
   else
     envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+  sc->mixtospdif = en;
   return 0;
 }
 
