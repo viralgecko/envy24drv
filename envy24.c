@@ -390,7 +390,7 @@ static struct cfg_info cfg_table[] = {
 };
 
 static u_int32_t envy24_recfmt[] = {
-	SND_FORMAT(AFMT_S16_LE, 2, 0),
+        //SND_FORMAT(AFMT_S16_LE, 2, 0),
 	SND_FORMAT(AFMT_S32_LE, 2, 0),
 	0
 };
@@ -419,7 +419,7 @@ static struct envy24_emldma envy24_pemltab[] = {
 };
 
 static struct envy24_emldma envy24_remltab[] = {
-	{SND_FORMAT(AFMT_S16_LE, 2, 0), envy24_r16sl, 4},
+        {SND_FORMAT(AFMT_S16_LE, 2, 0), envy24_r16sl, 4},
 	{SND_FORMAT(AFMT_S32_LE, 2, 0), envy24_r32sl, 8},
 	{0, NULL, 0}
 };
@@ -1663,20 +1663,18 @@ envy24_r32sl(struct sc_chinfo *ch)
 	dst = sndbuf_getfreeptr(ch->buffer) / 4;
 	src = dst / 2 + ch->offset;
 	dsize = ch->size / 4;
-	ssize = ch->size / 8;
+	ssize = ENVY24_SAMPLE_NUM;
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 	src %= ssize;
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_PREREAD);
 
 	for (i = 0; i < length; i++) {
-	        data[dst] = dmabuf[src * ENVY24_REC_CHNUM + slot].buffer >> 8;
-	        data[dst + 1] = dmabuf[src * ENVY24_REC_CHNUM + slot + 1].buffer >> 8;
+	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer;
+	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer;
 		dst += 2;
 		dst %= dsize;
 		src++;
 		src %= ssize;
 	}
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_POSTREAD);
 	
 	return;
 }
@@ -1696,9 +1694,8 @@ envy24_r16sl(struct sc_chinfo *ch)
 	dst = sndbuf_getfreeptr(ch->buffer) / 2;
 	src = dst / 2 + ch->offset;
 	dsize = ch->size / 2;
-	ssize = ch->size / 8;
+	ssize = ENVY24_SAMPLE_NUM;
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_PREREAD);
 
 	for (i = 0; i < length; i++) {
 	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 16;
@@ -1708,7 +1705,6 @@ envy24_r16sl(struct sc_chinfo *ch)
 		src++;
 		src %= ssize;
 	}
-	bus_dmamap_sync(ch->parent->dmat, ch->parent->rmap, BUS_DMASYNC_POSTREAD);
 	
 	return;
 }
