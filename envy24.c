@@ -1749,7 +1749,10 @@ envy24chan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channe
 		snd_mtxlock(sc->lock);
 		/* these 2 values are dummy */
 		ch->unit = 4;
-		ch->blk = 10240;
+		if(ch->dir == PCMDIR_PLAY)
+		  ch->blk = 10240;
+		else
+		  ch->blk = 12288;
 	}
 	snd_mtxunlock(sc->lock);
 
