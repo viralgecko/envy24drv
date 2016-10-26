@@ -390,7 +390,7 @@ static struct cfg_info cfg_table[] = {
 };
 
 static u_int32_t envy24_recfmt[] = {
-        //SND_FORMAT(AFMT_S16_LE, 2, 0),
+        SND_FORMAT(AFMT_S16_LE, 2, 0),
 	SND_FORMAT(AFMT_S32_LE, 2, 0),
 	0
 };
@@ -1553,7 +1553,7 @@ envy24_p32sl(struct sc_chinfo *ch)
 	src = sndbuf_getreadyptr(ch->buffer) / 4;
 	dst = src / 2 + ch->offset;
 	ssize = ch->size / 4;
-	dsize = ch->size / 8;
+	dsize = ENVY24_SAMPLE_NUM;
 	slot = ch->num * 2;
 	
         //bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
@@ -1588,7 +1588,7 @@ envy24_p16sl(struct sc_chinfo *ch)
 	src = sndbuf_getreadyptr(ch->buffer) / 2;
 	dst = src / 2 + ch->offset;
 	ssize = ch->size / 2;
-	dsize = ch->size / 4;
+	dsize = ENVY24_SAMPLE_NUM;
 	slot = ch->num * 2;
 #if(0)
 	device_printf(ch->parent->dev, "envy24_p16sl():%lu-->%lu(%lu)\n", src, dst, length);
@@ -1631,7 +1631,7 @@ envy24_p8u(struct sc_chinfo *ch)
 	src = sndbuf_getreadyptr(ch->buffer);
 	dst = src / 2 + ch->offset;
 	ssize = ch->size;
-	dsize = ch->size / 4;
+	dsize = ENVY24_SAMPLE_NUM;
 	slot = ch->num * 2;
 
 	//bus_dmamap_sync(ch->parent->dmat, ch->parent->pmap, BUS_DMASYNC_PREWRITE);
@@ -1648,6 +1648,8 @@ envy24_p8u(struct sc_chinfo *ch)
 	return;
 }
 
+/* I don't now why I need a offset of 1000 at src,
+** but it does the magic trick.*/
 static void
 envy24_r32sl(struct sc_chinfo *ch)
 {
@@ -1661,15 +1663,15 @@ envy24_r32sl(struct sc_chinfo *ch)
 	dmabuf = ch->parent->rbuf;
 	data = (u_int32_t *)ch->data;
 	dst = sndbuf_getfreeptr(ch->buffer) / 4;
-	src = dst / 2 + ch->offset;
+	src = dst / 2 + 1000; // ch->offset;
 	dsize = ch->size / 4;
 	ssize = ENVY24_SAMPLE_NUM;
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
 	src %= ssize;
 
 	for (i = 0; i < length; i++) {
-	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer;
-	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer;
+	  data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer;
+	  data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer;
 		dst += 2;
 		dst %= dsize;
 		src++;
@@ -1692,14 +1694,15 @@ envy24_r16sl(struct sc_chinfo *ch)
 	dmabuf = ch->parent->rbuf;
 	data = (u_int16_t *)ch->data;
 	dst = sndbuf_getfreeptr(ch->buffer) / 2;
-	src = dst / 2 + ch->offset;
+	src = dst / 2 + 1000; //ch->offset;
 	dsize = ch->size / 2;
 	ssize = ENVY24_SAMPLE_NUM;
 	slot = (ch->num - ENVY24_CHAN_REC_ADC1) * 2;
+	src %= ssize;
 
 	for (i = 0; i < length; i++) {
-	        data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 16;
-	        data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer >> 16;
+	  data[dst] = dmabuf[(src * ENVY24_REC_CHNUM) + slot].buffer >> 16;
+	  data[dst + 1] = dmabuf[(src * ENVY24_REC_CHNUM) + slot + 1].buffer >> 16;
 		dst += 2;
 		dst %= dsize;
 		src++;
