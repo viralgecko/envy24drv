@@ -1119,14 +1119,14 @@ cpldwr(struct sc_info *sc, uint8_t addr, uint8_t data)
   uint8_t temp;
   int i;
   mask = envy24_gpiogetmask(sc);
-  if(mask & 0x3)
+  if(mask & 0x3B)
     return -1;
   dir = envy24_gpiogetdir(sc);
-  if(!(dir & 0x3))
+  if(!(dir & 0x3B))
     return -2;
   gpio = envy24_gpiord(sc);
-  envy24_gpiowr(sc, gpio | 0x03);
-  DELAY(32);
+  envy24_gpiowr(sc, (gpio | 0x03) & 0x38);
+  DELAY(16);
   for(i = 0; i < 8; i++){
     help = (addr >> (7 - i)) & 0x01;
     temp = (gpio & 0xFC) | (help & (~0x02));
@@ -1145,10 +1145,51 @@ cpldwr(struct sc_info *sc, uint8_t addr, uint8_t data)
     envy24_gpiowr(sc, temp);
     DELAY(16);
   }
-    envy24_gpiowr(sc, gpio | 0x3);
+    envy24_gpiowr(sc, gpio | 0x3B);
     return 0;
 }
 
+static int
+cpldwrv(struct sc_info *sc, uint8_t addr, uint8_t data)
+{
+  uint8_t gpio, mask, dir;
+  uint16_t ad, da, help, temp;
+  int i;
+  ad = addr + (0x01 << 8);
+  da = (data << 1) + 1;
+  mask = envy24_gpiogetmask(sc);
+  if(mask & 0x3B)
+    return -1;
+  dir = envy24_gpiogetdir(sc);
+  if(!(dir & 0x3B))
+    return -2;
+  gpio = envy24_gpiord(sc);
+  for(i = 0; i < 9; i++)
+    {
+      help = (ad >> (8 - i)) & 0x01;
+      temp = (gpio & 0xFC) | (help & (~0x02));
+      envy24_gpiowr(sc, temp);
+      DELAY(16);
+      temp = (gpio & 0xFC) | (help | 0x02);
+      envy24_gpiowr(sc, temp);
+      DELAY(16);
+      if(!i)
+	gpio ^= 0x20;
+    }
+  for(i = 0; i < 9; i++){
+    help = (da >> (8 - i)) & 0x01;
+    temp = (gpio & 0xFC) | (help & (~0x02));
+    envy24_gpiowr(sc, temp);
+    DELAY(16);
+    temp = (gpio & 0xFC) | (help | 0x02);
+    envy24_gpiowr(sc, temp);
+    DELAY(16);
+    if(i == 7)
+      gpio ^= 0x20;
+  }
+
+}
+  
 /* -------------------------------------------------------------------- */
 
 /* hardware access routeines */
