@@ -506,7 +506,7 @@
 #define HP_ADDR                 0xF0
 #define HP_ON_F                 0x20
 #define HP_ON_L                 0x30
-#define HP_OFF_F                0x10
+#define HP_OFF_F                0x30
 #define HP_OFF_L                0x00
 
 

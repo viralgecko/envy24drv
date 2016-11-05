@@ -1125,25 +1125,26 @@ cpldwr(struct sc_info *sc, uint8_t addr, uint8_t data)
   if(!(dir & 0x3B))
     return -2;
   gpio = envy24_gpiord(sc);
-  envy24_gpiowr(sc, (gpio | 0x03) & 0x38);
-  DELAY(16);
+  gpio = (gpio | 0x03) & ~0x38;
+  envy24_gpiowr(sc, gpio);
+  DELAY(1);
   for(i = 0; i < 8; i++){
     help = (addr >> (7 - i)) & 0x01;
     temp = (gpio & 0xFC) | (help & (~0x02));
     envy24_gpiowr(sc, temp);
-    DELAY(16);
+    DELAY(1);
     temp = (gpio & 0xFC) | (help | 0x02);
     envy24_gpiowr(sc, temp);
-    DELAY(16);
+    DELAY(1);
   }
   for(i = 0; i < 8; i++){
     help = (data >> (7 - i)) & 0x01;
     temp = (gpio & 0xFC) | (help & (~0x02));
     envy24_gpiowr(sc, temp);
-    DELAY(16);
+    DELAY(1);
     temp = (gpio & 0xFC) | (help | 0x02);
     envy24_gpiowr(sc, temp);
-    DELAY(16);
+    DELAY(1);
   }
     envy24_gpiowr(sc, gpio | 0x3B);
     return 0;
@@ -1169,10 +1170,10 @@ cpldwrv(struct sc_info *sc, uint8_t addr, uint8_t data)
       help = (ad >> (8 - i)) & 0x01;
       temp = (gpio & 0xFC) | (help & (~0x02));
       envy24_gpiowr(sc, temp);
-      DELAY(16);
+      DELAY(1);
       temp = (gpio & 0xFC) | (help | 0x02);
       envy24_gpiowr(sc, temp);
-      DELAY(16);
+      DELAY(1);
       if(!i)
 	gpio ^= 0x20;
     }
@@ -1180,14 +1181,14 @@ cpldwrv(struct sc_info *sc, uint8_t addr, uint8_t data)
     help = (da >> (8 - i)) & 0x01;
     temp = (gpio & 0xFC) | (help & (~0x02));
     envy24_gpiowr(sc, temp);
-    DELAY(16);
+    DELAY(1);
     temp = (gpio & 0xFC) | (help | 0x02);
     envy24_gpiowr(sc, temp);
-    DELAY(16);
+    DELAY(1);
     if(i == 7)
       gpio ^= 0x20;
   }
-
+  return 0;
 }
   
 /* -------------------------------------------------------------------- */
@@ -1609,8 +1610,12 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume(viod *codec, %i, %u, %u)\n",dir,left,right);
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume: adress=%x\n",a);
 #endif
-     if( dir == PCMDIR_REC && ptr->num == 1)
-	 device_printf(sc->dev,"Preamp control not implemented yet\n");
+     if( dir == PCMDIR_REC && ptr->num == 0){
+       cpldwrv(sc, 0xF3, left);
+       DELAY(6);
+       cpldwrv(sc, 0xEB, right);
+       //device_printf(sc->dev,"Preamp control not implemented yet\n");
+     }
      else if( dir == PCMDIR_REC)
 	 return;
      else if(dir == PCMDIR_PLAY)
@@ -2259,6 +2264,9 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 			sc->cfg->codec->setvolume(sc->dac[i], PCMDIR_PLAY, left, right);
 			}*/
 	}
+	else if( ch==15){
+	  sc->cfg->codec->setvolume(sc->adc[0], PCMDIR_REC, left, right);
+	}
 	else if(0 < ch && ch < 11) {
 		/* set volume value for hardware */
 		if ((sc->left[hwch] = 100 - left) > ENVY24_VOL_MIN)
@@ -2378,7 +2386,7 @@ sysctl_dev_pcm_hp(SYSCTL_HANDLER_ARGS)
     {
       if(cpldwr(sc, HP_ADDR, HP_ON_F))
 	return -1;
-      DELAY(64);
+      DELAY(6);
       if(cpldwr(sc, HP_ADDR, HP_ON_L))
 	return -1;
     }
@@ -2386,7 +2394,7 @@ sysctl_dev_pcm_hp(SYSCTL_HANDLER_ARGS)
     {
       if(cpldwr(sc, HP_ADDR, HP_OFF_F))
 	return -1;
-      DELAY(64);
+      DELAY(6);
       if(cpldwr(sc, HP_ADDR, HP_OFF_L))
 	return -1;
     }
@@ -2644,7 +2652,7 @@ envy24_putcfg(struct sc_info *sc)
 		printf("16.9344MHz(44.1kHz*384)\n");
 		break;
 	case 0x80:
-		printf("from external clock synthesizer chip\n");
+		printf("from exernal clock synthesizer chip\n");
 		break;
 	default:
 		printf("illegal system setting\n");
@@ -2721,7 +2729,7 @@ envy24_init(struct sc_info *sc)
 #if(0)
 	int rtn;
 #endif
-	int i;
+	int i, gpio;
 	u_int32_t sv, sd;
 	struct sysctl_ctx_list *clist;
 	struct sysctl_oid *oid;
@@ -2813,6 +2821,8 @@ envy24_init(struct sc_info *sc)
   	      OID_AUTO, "hp", CTLTYPE_INT | CTLFLAG_RW,
 	      sc, 0,
 	      sysctl_dev_pcm_hp, "I", "Enable the Headphones");
+	    gpio = envy24_gpiord(sc);
+	    envy24_gpiowr(sc, gpio | 0x3);
 	  }
         SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
 	  OID_AUTO, "mix_to_ch1", CTLTYPE_INT | CTLFLAG_RW,
