@@ -175,8 +175,11 @@ struct sc_info {
 	/* channel info table */
 	unsigned	chnum;
 	struct sc_chinfo chan[11];
-        int             mixtoch;
-        int             mixtospdif;
+
+        /* sysctl vars */
+        int ch1;
+        int spdif;
+        int hp;
 };
 
 /* -------------------------------------------------------------------- */
@@ -372,8 +375,8 @@ static struct cfg_info cfg_table[] = {
 		{
 		"Envy24 audio (ESI ESP1010)",
 		0x4154, 0x3131,
-		0x0f, 0x00, 0x01, 0x03,
-		0xff, 0x00, 0x00,
+		0x3f, 0x80, 0x70, 0x03,
+		0xc4, 0x39, 0x3b,
 		0x10, 0x20, 0x40, 0x00, 0x00,
 		0x00,
 		&esp_codec,
@@ -423,7 +426,6 @@ static struct envy24_emldma envy24_remltab[] = {
 	{SND_FORMAT(AFMT_S32_LE, 2, 0), envy24_r32sl, 8},
 	{0, NULL, 0}
 };
-
 
 /* -------------------------------------------------------------------- */
 
@@ -789,7 +791,7 @@ envy24_gpiowr(struct sc_info *sc, u_int32_t data)
 	return;
 }
 
-#if 0
+#if 1
 static u_int32_t
 envy24_gpiogetmask(struct sc_info *sc)
 {
@@ -804,7 +806,7 @@ envy24_gpiosetmask(struct sc_info *sc, u_int32_t mask)
 	return;
 }
 
-#if 0
+#if 1
 static u_int32_t
 envy24_gpiogetdir(struct sc_info *sc)
 {
@@ -1103,6 +1105,92 @@ envy24_delta_ak4524_setvolume(void *codec, int dir, unsigned int left, unsigned 
   }
 */
 
+/* -------------------------------------------------------------------- */
+
+/* esi esp 1010 cpld control routeines */
+
+static int
+cpldwr(struct sc_info *sc, uint8_t addr, uint8_t data)
+{
+  uint8_t gpio;
+  uint8_t mask;
+  uint8_t dir;
+  uint8_t help = 0;
+  uint8_t temp;
+  int i;
+  mask = envy24_gpiogetmask(sc);
+  if(mask & 0x3B)
+    return -1;
+  dir = envy24_gpiogetdir(sc);
+  if(!(dir & 0x3B))
+    return -2;
+  gpio = envy24_gpiord(sc);
+  gpio = (gpio | 0x03) & ~0x38;
+  envy24_gpiowr(sc, gpio);
+  DELAY(1);
+  for(i = 0; i < 8; i++){
+    help = (addr >> (7 - i)) & 0x01;
+    temp = (gpio & 0xFC) | (help & (~0x02));
+    envy24_gpiowr(sc, temp);
+    DELAY(1);
+    temp = (gpio & 0xFC) | (help | 0x02);
+    envy24_gpiowr(sc, temp);
+    DELAY(1);
+  }
+  for(i = 0; i < 8; i++){
+    help = (data >> (7 - i)) & 0x01;
+    temp = (gpio & 0xFC) | (help & (~0x02));
+    envy24_gpiowr(sc, temp);
+    DELAY(1);
+    temp = (gpio & 0xFC) | (help | 0x02);
+    envy24_gpiowr(sc, temp);
+    DELAY(1);
+  }
+    envy24_gpiowr(sc, gpio | 0x3B);
+    return 0;
+}
+
+static int
+cpldwrv(struct sc_info *sc, uint8_t addr, uint8_t data)
+{
+  uint8_t gpio, mask, dir;
+  uint16_t ad, da, help, temp;
+  int i;
+  ad = addr + (0x01 << 8);
+  da = (data << 1) + 1;
+  mask = envy24_gpiogetmask(sc);
+  if(mask & 0x3B)
+    return -1;
+  dir = envy24_gpiogetdir(sc);
+  if(!(dir & 0x3B))
+    return -2;
+  gpio = envy24_gpiord(sc);
+  for(i = 0; i < 9; i++)
+    {
+      help = (ad >> (8 - i)) & 0x01;
+      temp = (gpio & 0xFC) | (help & (~0x02));
+      envy24_gpiowr(sc, temp);
+      DELAY(1);
+      temp = (gpio & 0xFC) | (help | 0x02);
+      envy24_gpiowr(sc, temp);
+      DELAY(1);
+      if(!i)
+	gpio ^= 0x20;
+    }
+  for(i = 0; i < 9; i++){
+    help = (da >> (8 - i)) & 0x01;
+    temp = (gpio & 0xFC) | (help & (~0x02));
+    envy24_gpiowr(sc, temp);
+    DELAY(1);
+    temp = (gpio & 0xFC) | (help | 0x02);
+    envy24_gpiowr(sc, temp);
+    DELAY(1);
+    if(i == 7)
+      gpio ^= 0x20;
+  }
+  return 0;
+}
+  
 /* -------------------------------------------------------------------- */
 
 /* hardware access routeines */
@@ -1522,8 +1610,12 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume(viod *codec, %i, %u, %u)\n",dir,left,right);
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume: adress=%x\n",a);
 #endif
-     if( dir == PCMDIR_REC && ptr->num == 1)
-	 device_printf(sc->dev,"Preamp control not implemented yet\n");
+     if( dir == PCMDIR_REC && ptr->num == 0){
+       cpldwrv(sc, 0xF3, left);
+       DELAY(6);
+       cpldwrv(sc, 0xEB, right);
+       //device_printf(sc->dev,"Preamp control not implemented yet\n");
+     }
      else if( dir == PCMDIR_REC)
 	 return;
      else if(dir == PCMDIR_PLAY)
@@ -2174,6 +2266,9 @@ envy24mixer_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right
 			sc->cfg->codec->setvolume(sc->dac[i], PCMDIR_PLAY, left, right);
 			}*/
 	}
+	else if( ch==15){
+	  sc->cfg->codec->setvolume(sc->adc[0], PCMDIR_REC, left, right);
+	}
 	else if(0 < ch && ch < 11) {
 		/* set volume value for hardware */
 		if ((sc->left[hwch] = 100 - left) > ENVY24_VOL_MIN)
@@ -2231,7 +2326,7 @@ sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
   sc = oidp->oid_arg1;
   if(sc == NULL)
     return -1;
-  en = sc->mixtoch;
+  en = sc->ch1;
   error = sysctl_handle_int(oidp, &en, 0, req);
   if(error || req->newptr == NULL)
     return error;
@@ -2242,21 +2337,23 @@ sysctl_dev_pcm_mix_to_ch1(SYSCTL_HANDLER_ARGS)
       envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
     }
   else
-    envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
-  sc->mixtoch = en;
+    {
+      envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_DMA, 0, 0);
+    }
+  sc->ch1 = en;
   return 0;
 }
 
 static int
 sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
 {
-  int en;
+  int en = 0;
   int error;
   struct sc_info *sc;
   sc = oidp->oid_arg1;
   if(sc == NULL)
     return -1;
-  en = sc->mixtospdif;
+  en = sc->spdif;
   error = sysctl_handle_int(oidp, &en, 0, req);
   if(error || req->newptr == NULL)
     return error;
@@ -2268,7 +2365,42 @@ sysctl_dev_pcm_mix_to_spdif(SYSCTL_HANDLER_ARGS)
     }
   else
     envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
-  sc->mixtospdif = en;
+  sc->spdif = en;
+  return 0;
+}
+
+static int
+sysctl_dev_pcm_hp(SYSCTL_HANDLER_ARGS)
+{
+  int en = 0;
+  int error;
+  struct sc_info *sc;
+  sc = oidp->oid_arg1;
+  if(sc == NULL)
+    return -1;
+  en = sc->hp;
+  error = sysctl_handle_int(oidp, &en, 0, req);
+  if(error || req->newptr == NULL)
+    return error;
+  if( en < 0 || en > 1)
+    return EINVAL;
+  if(en)
+    {
+      if(cpldwr(sc, HP_ADDR, HP_ON_F))
+	return -1;
+      DELAY(6);
+      if(cpldwr(sc, HP_ADDR, HP_ON_L))
+	return -1;
+    }
+  else
+    {
+      if(cpldwr(sc, HP_ADDR, HP_OFF_F))
+	return -1;
+      DELAY(6);
+      if(cpldwr(sc, HP_ADDR, HP_OFF_L))
+	return -1;
+    }
+  sc->hp = en;
   return 0;
 }
 
@@ -2355,8 +2487,8 @@ envy24_pci_probe(device_t dev)
 #endif
 	if (pci_get_device(dev) == PCID_ENVY24 &&
 	    pci_get_vendor(dev) == PCIV_ENVY24) {
-		sv = pci_get_subvendor(dev);
-		sd = pci_get_subdevice(dev);
+		sd = pci_get_subvendor(dev);
+		sv = pci_get_subdevice(dev);
 		for (i = 0; cfg_table[i].subvendor != 0 || cfg_table[i].subdevice != 0; i++) {
 			if (cfg_table[i].subvendor == sv &&
 			    cfg_table[i].subdevice == sd) {
@@ -2522,7 +2654,7 @@ envy24_putcfg(struct sc_info *sc)
 		printf("16.9344MHz(44.1kHz*384)\n");
 		break;
 	case 0x80:
-		printf("from external clock synthesizer chip\n");
+		printf("from exernal clock synthesizer chip\n");
 		break;
 	default:
 		printf("illegal system setting\n");
@@ -2599,7 +2731,7 @@ envy24_init(struct sc_info *sc)
 #if(0)
 	int rtn;
 #endif
-	int i;
+	int i, gpio;
 	u_int32_t sv, sd;
 	struct sysctl_ctx_list *clist;
 	struct sysctl_oid *oid;
@@ -2680,12 +2812,20 @@ envy24_init(struct sc_info *sc)
 	envy24_route(sc, ENVY24_ROUTE_DAC_1, ENVY24_ROUTE_CLASS_MIX, 0, 0);
 	envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_DMA, 0, 0);
 	/* envy24_route(sc, ENVY24_ROUTE_DAC_SPDIF, ENVY24_ROUTE_CLASS_MIX, 0, 0); */
+	sc->ch1 = 1;
+	sc->spdif = 0;
+	sc->hp = 0;
         clist = device_get_sysctl_ctx(sc->dev);
 	oid = device_get_sysctl_tree(sc->dev);
-        /*SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
-	  OID_AUTO, "mixer_ctl", CTLTYPE_INT | CTLFLAG_RW,
-	  sc, 0,
-	  sysctl_dev_pcm_mixer, "I", "0 : codec, 1: controler");*/
+	if(sc->cfg->subvendor==0x4154 && sc->cfg->subdevice==0x3131)
+	  {
+	    SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
+  	      OID_AUTO, "hp", CTLTYPE_INT | CTLFLAG_RW,
+	      sc, 0,
+	      sysctl_dev_pcm_hp, "I", "Enable the Headphones");
+	    gpio = envy24_gpiord(sc);
+	    envy24_gpiowr(sc, gpio | 0x3);
+	  }
         SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
 	  OID_AUTO, "mix_to_ch1", CTLTYPE_INT | CTLFLAG_RW,
 	  sc, 0,
