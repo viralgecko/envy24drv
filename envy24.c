@@ -2943,8 +2943,6 @@ envy24_pci_attach(device_t dev)
 
 	/* initialize card */
 	err = envy24_init(sc);
-	sc->mixtoch = 1;
-	sc->mixtospdif = 0;
 	if (err) {
 		device_printf(dev, "unable to initialize the card\n");
 		goto bad;
