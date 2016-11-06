@@ -508,6 +508,9 @@
 #define HP_ON_L                 0x30
 #define HP_OFF_F                0x30
 #define HP_OFF_L                0x00
+#define MIC1V_ADDR              0xF3
+#define MIC2V_ADDR              0xEB
+#define MIC_ADDR                0xF1
 
 
 /* end of file */

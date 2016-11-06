@@ -180,6 +180,7 @@ struct sc_info {
         int ch1;
         int spdif;
         int hp;
+        int mic;
 };
 
 /* -------------------------------------------------------------------- */
@@ -1611,9 +1612,9 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume: adress=%x\n",a);
 #endif
      if( dir == PCMDIR_REC && ptr->num == 0){
-       cpldwrv(sc, 0xF3, left);
+       cpldwrv(sc, MIC1V_ADDR, 5 * l / 2);
        DELAY(6);
-       cpldwrv(sc, 0xEB, right);
+       cpldwrv(sc, MIC2V_ADDR, 5 * l / 2);
        //device_printf(sc->dev,"Preamp control not implemented yet\n");
      }
      else if( dir == PCMDIR_REC)
@@ -2404,6 +2405,27 @@ sysctl_dev_pcm_hp(SYSCTL_HANDLER_ARGS)
   return 0;
 }
 
+static int
+sysctl_dev_pcm_mic(SYSCTL_HANDLER_ARGS)
+{
+  int en = 0;
+  int error;
+  struct sc_info *sc;
+  sc = oidp->oid_arg1;
+  if(sc == NULL)
+    return -1;
+  en = sc->mic;
+  error = sysctl_handle_int(oidp, &en, 0, req);
+  if(error || req->newptr == NULL)
+    return error;
+  if( en < 0 || en > 3)
+    return EINVAL;
+  if(cpldwr(sc, MIC_ADDR, en << 6))
+    return -1;
+  sc->mic = en;
+  return 0;
+}
+
 /* -------------------------------------------------------------------- */
 
 /* The interrupt handler */
@@ -2823,6 +2845,10 @@ envy24_init(struct sc_info *sc)
   	      OID_AUTO, "hp", CTLTYPE_INT | CTLFLAG_RW,
 	      sc, 0,
 	      sysctl_dev_pcm_hp, "I", "Enable the Headphones");
+	    SYSCTL_ADD_PROC(clist, SYSCTL_CHILDREN(oid),
+  	      OID_AUTO, "mic", CTLTYPE_INT | CTLFLAG_RW,
+	      sc, 0,
+	      sysctl_dev_pcm_mic, "I", "Enable the preamps of input 1 and 2");
 	    gpio = envy24_gpiord(sc);
 	    envy24_gpiowr(sc, gpio | 0x3);
 	  }
