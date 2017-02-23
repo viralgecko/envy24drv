@@ -1604,25 +1604,28 @@ envy24_esp_ak4358_setvolume(void *codec, int dir, unsigned int left, unsigned in
 	return;
      struct sc_info *sc = ptr->parent;
      char a = (char)(ptr->addr);
-     char l = (char)(left);
-     char r = (char)(right);
-     int i = 0;
+     unsigned int l;
+     unsigned int r;
 #if(0)
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume(viod *codec, %i, %u, %u)\n",dir,left,right);
      device_printf(sc->dev,"envy24_esp_ak4358_setvolume: adress=%x\n",a);
 #endif
      if( dir == PCMDIR_REC && ptr->num == 0){
-       cpldwrv(sc, MIC1V_ADDR, 5 * l / 2);
+       l = (left * 255)/100;
+       r = (right * 255)/100;
+       cpldwrv(sc, MIC1V_ADDR, (unsigned char)(l));
        DELAY(6);
-       cpldwrv(sc, MIC2V_ADDR, 5 * l / 2);
+       cpldwrv(sc, MIC2V_ADDR, (unsigned char)(r));
        //device_printf(sc->dev,"Preamp control not implemented yet\n");
      }
      else if( dir == PCMDIR_REC)
 	 return;
      else if(dir == PCMDIR_PLAY)
        {
-         i = envy24_wri2c(sc, AK4358, a, l | 0x80);
-	 envy24_wri2c(sc, AK4358, a + 1, r | 0x80);
+	 l = (left * 127)/100;
+         r = (right * 127)/100;
+         envy24_wri2c(sc, AK4358, a, (unsigned char)(l) | 0x80);
+	 envy24_wri2c(sc, AK4358, a + 1, (unsigned char)(r) | 0x80);
 	 return;
        }
 }
